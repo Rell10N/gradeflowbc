@@ -1,0 +1,2190 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#121212">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <title>GradeFlow: Financial Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* --- 1. CSS VARIABLES (ORIGINAL V1 PALETTE) --- */
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --card-glass: rgba(30, 30, 30, 0.7);
+            --text-main: #ffffff;
+            --text-sec: #aaaaaa;
+            --accent-start: #00c6ff;
+            --accent-end: #0072ff;
+            --danger: #ff4b4b;
+            --success: #00e676;
+            --shadow: 0 4px 15px rgba(0,0,0,0.3);
+            --input-bg: #121212;
+            --input-border: #333333;
+            --btn-bg: #252525;
+            --ring-bg: #2a2a2a;
+            --font-main: 'Inter', sans-serif;
+            --transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        [data-theme="light"] {
+            --bg-color: #f0f2f5;
+            --card-bg: #ffffff;
+            --card-glass: rgba(255, 255, 255, 0.8);
+            --text-main: #333333;
+            --text-sec: #666666;
+            --shadow: 0 4px 15px rgba(0,0,0,0.1);
+            --input-bg: #f0f2f5;
+            --input-border: #d5d9e0;
+            --btn-bg: #e8ebf0;
+            --ring-bg: #dfe3e9;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
+        /* Custom Scrollbar styling (Широкая зона захвата для пальца/мыши, но визуально тонкий скроллбар) */
+        ::-webkit-scrollbar {
+            width: 14px; /* Физическая ширина скроллбара (зона захвата пальцем) */
+            height: 14px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent; /* Полностью прозрачный трек */
+        }
+        ::-webkit-scrollbar-thumb {
+            background-color: rgba(255, 255, 255, 0.15); /* Цвет ползунка */
+            border-radius: 10px;
+            /* Трюк: прозрачные границы сжимают видимую часть до 6px, оставляя область касания широкой */
+            border: 4px solid transparent;
+            background-clip: padding-box;
+            transition: background-color 0.2s;
+        }
+        ::-webkit-scrollbar-thumb:hover,
+        ::-webkit-scrollbar-thumb:active {
+            background-color: rgba(255, 255, 255, 0.35); /* Скроллбар становится ярче при зажатии/наведении */
+            border: 3px solid transparent; /* Немного расширяется визуально при взаимодействии */
+        }
+
+        html, body {
+            height: 100vh;
+            height: 100dvh;
+            width: 100vw;
+            overflow: hidden;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            overscroll-behavior: none;
+            touch-action: none;
+        }
+        body {
+            font-family: var(--font-main);
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            transition: background-color 0.4s;
+        }
+        #history-list, .modal-content, textarea, #sidebar {
+            touch-action: pan-y !important;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* --- 2. UTILITY CLASSES --- */
+        .hidden { display: none !important; }
+        .flex-center { display: flex; justify-content: center; align-items: center; }
+        .glass {
+            background: var(--card-glass);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 16px;
+        }
+        .btn {
+            border: none; outline: none; cursor: pointer;
+            font-family: var(--font-main); transition: var(--transition);
+            user-select: none;
+        }
+        .btn:active { transform: scale(0.95); }
+
+        /* --- 3. SPLASH SCREEN --- */
+        #splash-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg-color); z-index: 100;
+            flex-direction: column; gap: 20px;
+        }
+        .logo {
+            font-size: 2.5rem; font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-start), var(--accent-end));
+            background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            margin-bottom: 40px;
+        }
+        .splash-btn {
+            width: 200px; padding: 15px; border-radius: 30px;
+            font-weight: 600; font-size: 1.1rem; color: white;
+            background: #2a2a2a; box-shadow: var(--shadow);
+        }
+        .splash-btn.primary {
+            background: linear-gradient(90deg, var(--accent-start), var(--accent-end));
+        }
+
+        /* --- 4. MAIN INTERFACE --- */
+        #app-container {
+            height: 100%; display: flex; flex-direction: column;
+            position: relative; overflow: hidden; /* Жестко запрещаем скролл на главном экране */
+        }
+
+        /* Header & Analytics Bar */
+        header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 15px 20px 5px 20px;
+            position: sticky; top: 0; z-index: 10;
+            background: var(--bg-color);
+        }
+        .icon-btn {
+            background: transparent; color: var(--text-main);
+            font-size: 1.5rem; padding: 5px;
+        }
+        
+        /* New Top Analytics Section */
+        .top-analytics-bar {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 5px 20px;
+            margin-bottom: 10px;
+            font-size: 0.75rem; color: var(--text-sec);
+            background: var(--bg-color); /* Sticks with header */
+        }
+        .ana-box { display: flex; flex-direction: column; align-items: center; width: 30%; }
+        .ana-val { font-weight: 700; color: var(--accent-start); font-size: 0.85rem; margin-top: 2px;}
+
+        /* Date Nav */
+        .date-navigator {
+            display: flex; align-items: center; gap: 5px;
+            font-weight: 600;
+        }
+        .date-display { font-size: 1rem; min-width: 80px; text-align: center; }
+
+        /* Dashboard */
+        .dashboard {
+            padding: 4px 20px;
+            display: flex; flex-direction: column; align-items: center;
+            gap: 8px; flex: 1; justify-content: center;
+        }
+        
+        /* Circular Progress (IMPROVED) */
+        .progress-container {
+            position: relative; width: min(250px, 34vh); height: min(250px, 34vh); /* круг уменьшается на низких экранах, чтобы кнопки внизу не обрезались */
+            display: flex; justify-content: center; align-items: center;
+        }
+
+         
+
+        svg.circle-chart {
+            transform: rotate(-90deg);
+            width: 100%; height: 100%;
+            overflow: visible;
+        }
+        .circle-bg { fill: none; stroke: var(--ring-bg); stroke-width: 2.5; }
+        .circle-bar {
+            fill: none; 
+            stroke: url(#gradient); 
+            stroke-width: 4; 
+            stroke-linecap: round;
+            transition: stroke-dasharray 0.6s ease-out;
+        }
+        .balance-info {
+            position: absolute;
+            display: flex; flex-direction: column; align-items: center;
+        }
+        .balance-label { font-size: 0.8rem; color: var(--text-sec); margin-bottom: 5px; }
+        .balance-amount { font-size: 2.2rem; font-weight: 700; white-space: nowrap; letter-spacing: -1px; }
+        .currency { font-size: 0.9rem; color: var(--text-sec); }
+        .goal-percent { font-size: 0.8rem; color: var(--accent-start); margin-top: 8px; font-weight: 600; }
+
+        /* Beautiful Wide History Button */
+        .btn-history-wide {
+            width: 100%; max-width: 280px;
+            padding: 8px 12px;
+            margin-top: 2px;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.05);
+            color: var(--text-sec);
+            font-size: 0.85rem;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .btn-history-wide:active { background: rgba(255,255,255,0.08); }
+
+        /* Controls Zone - Updated Positioning */
+        .controls-zone {
+            padding: 16px 20px 24px 20px; /* Ужали лишние отступы снизу и сверху */
+            display: flex; flex-direction: column; gap: 8px; /* Уменьшили зазоры между элементами ввода */
+            background: var(--card-bg);
+            border-top-left-radius: 24px;
+            border-top-right-radius: 24px;
+            box-shadow: 0 -10px 30px rgba(0,0,0,0.5);
+            z-index: 20;
+        }
+
+        /* Input Group */
+        .manual-input-group {
+            display: flex; gap: 10px;
+        }
+        .mode-toggle {
+            padding: 0 15px; border-radius: 12px;
+            background: rgba(255,255,255,0.05); color: var(--success);
+            font-size: 1.5rem; line-height: 1; font-weight: 300;
+        }
+        .mode-toggle.expense { color: var(--danger); border: 1px solid var(--danger); }
+        
+        .input-field {
+            flex: 1; padding: 10px 14px; border-radius: 10px;
+            border: 1px solid var(--input-border); background: var(--input-bg);
+            color: var(--text-main); font-size: 1rem; text-align: center; font-weight: 600;
+        }
+        .btn-ok {
+            background: linear-gradient(135deg, var(--accent-start), var(--accent-end));
+            color: white; padding: 0 20px; border-radius: 12px; font-weight: 700;
+        }
+
+        /* Quick Buttons Grid */
+        .quick-add-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+        }
+        .quick-btn {
+            padding: 8px; background: var(--btn-bg); color: var(--text-main);
+            border-radius: 8px; font-weight: 500; font-size: 0.95rem;
+        }
+        
+        /* Day Logic */
+        .day-actions {
+            margin-top: 5px; display: flex; gap: 10px;
+        }
+        .action-btn {
+            flex: 1; padding: 10px; border-radius: 10px;
+            font-weight: 600; font-size: 0.85rem;
+        }
+        .btn-zero { background: rgba(255,75,75,0.15); color: var(--danger); }
+        .btn-finish { background: #252525; color: var(--text-main); border: 1px solid #333; }
+
+        /* --- 5. SIDEBAR (MENU) --- */
+        #sidebar {
+            position: fixed; top: 0; left: 0; width: 80%; max-width: 300px; height: 100%;
+            background: var(--card-bg); z-index: 50;
+            transform: translateX(-100%); transition: transform 0.3s ease;
+            padding: 25px; display: flex; flex-direction: column; gap: 20px;
+            box-shadow: 5px 0 20px rgba(0,0,0,0.5);
+        }
+        #sidebar.open { transform: translateX(0); }
+        .sidebar-header { font-size: 1.5rem; font-weight: 700; margin-bottom: 10px; }
+        
+        .setting-item { display: flex; flex-direction: column; gap: 8px; }
+        .setting-label { font-size: 0.9rem; color: var(--text-sec); }
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; }
+        
+        /* Switch */
+        .switch { position: relative; display: inline-block; width: 50px; height: 26px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #333; transition: .4s; border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute; content: ""; height: 20px; width: 20px;
+            left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%;
+        }
+        input:checked + .slider { background-color: var(--accent-end); }
+        input:checked + .slider:before { transform: translateX(24px); }
+
+        .btn-reset { margin-top: auto; width: 100%; background: #2a2a2a; color: var(--danger); border: 1px solid var(--danger); padding: 12px; border-radius: 8px; }
+        .btn-sidebar-link {
+            width: 100%; padding: 12px; background: rgba(255,255,255,0.05);
+            border-radius: 8px; color: var(--text-main); text-align: left;
+        }
+
+        /* Overlay */
+        #overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); z-index: 40;
+            opacity: 0; pointer-events: none; transition: opacity 0.3s;
+        }
+        #overlay.active { opacity: 1; pointer-events: all; }
+
+        /* --- 6. MODALS --- */
+        .modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg-color); z-index: 110; /* Set above splash screen (100) */
+            display: flex; flex-direction: column;
+            transform: translateY(100%); transition: transform 0.3s ease-in-out;
+        }
+        .modal.open { transform: translateY(0); }
+        .modal-header {
+            padding: 20px; display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .modal-content { flex: 1; padding: 20px; overflow-y: auto; }
+        
+        /* History Items & Accordion */
+        .history-item {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--card-bg); padding: 15px; border-radius: 12px;
+    /* Убрали отступ отсюда, чтобы он не конфликтовал при открытии */
+}
+.history-day-group {
+    margin-bottom: 14px; /* Задали красивый постоянный отступ для всей группы дня целиком */
+}
+        .history-item.day-header {
+            cursor: pointer;
+            transition: border-radius 0.25s;
+        }
+        .history-day-group:has(.day-details.open) .day-header {
+            border-bottom-left-radius: 0;
+            border-bottom-right-radius: 0;
+            margin-bottom: 0;
+        }
+        .day-details {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 0 0 12px 12px;
+            border: 0 solid transparent;
+        }
+        .day-details.open {
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-top: none;
+        }
+        .day-details-inner {
+            padding: 12px 15px 18px 15px; /* Comfortable spacing bottom */
+        }
+        .tx-detail-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            font-size: 0.9rem;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+        .tx-detail-row:last-child {
+            border-bottom: none;
+        }
+        .tx-detail-amount {
+            font-weight: 600;
+        }
+        .tx-detail-amount.income { color: var(--success); }
+        .tx-detail-amount.expense { color: var(--danger); }
+        .tx-detail-comment {
+            color: var(--text-sec);
+            font-size: 0.85rem;
+            max-width: 55%;
+            text-align: right;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .h-date { font-size: 0.8rem; color: var(--text-sec); }
+        .h-amount { font-weight: 700; font-size: 1.1rem; }
+        .h-amount.income { color: var(--success); }
+        .h-amount.expense { color: var(--danger); }
+
+        /* Confirm Popup */
+        .confirm-popup {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.9);
+            width: 85%; background: var(--card-bg); padding: 25px; border-radius: 16px;
+            z-index: 200; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            opacity: 0; pointer-events: none; transition: 0.2s; text-align: center; border: 1px solid #333;
+        }
+        .confirm-popup.active { opacity: 1; pointer-events: all; transform: translate(-50%, -50%) scale(1); }
+        .confirm-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: center; }
+
+        /* SVGs */
+        .svg-icon { width: 24px; height: 24px; fill: currentColor; }
+        
+        #history-list::-webkit-scrollbar {
+    display: none !important; /* Полностью отключаем системный скроллбар в истории */
+}
+
+/* --- WALLET TABS (CHIPS) --- */
+        .wallet-tabs-container {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            max-width: 100%;
+            padding: 4px 2px 8px 2px;
+            scrollbar-width: none;
+            touch-action: pan-x;
+            justify-content: flex-start;
+        }
+        @media (min-width: 350px) {
+            .wallet-tabs-container {
+                justify-content: center; /* На экранах пошире выравниваем по центру для красоты */
+            }
+        }
+        .wallet-tabs-container::-webkit-scrollbar {
+            display: none;
+        }
+        .wallet-tab {
+            padding: 6px 14px;
+            border-radius: 12px; /* Сделали форму более современной (чуть скругленный прямоугольник вместо круга) */
+            font-size: 0.8rem;
+            font-weight: 500;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: var(--text-sec);
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            outline: none;
+        }
+        .wallet-tab:active {
+            transform: scale(0.95);
+        }
+        .wallet-tab.active {
+            background: var(--text-main);
+            color: var(--bg-color); /* При активации инвертируем цвета для стильного контракта */
+            border-color: var(--text-main);
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        .wallet-tab.excluded { opacity: 0.45; text-decoration: line-through; }
+        .tx-detail-row.sel { background: rgba(0,198,255,0.15); border-radius: 8px; }
+        .merge-mode .tx-detail-row { cursor: pointer; }
+        .wallet-tab { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+        .modal-content { padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px)); }
+        #toast { position: fixed; top: calc(16px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); z-index: 300; padding: 10px 16px; border-radius: 12px; background: var(--card-bg); color: var(--text-main); border: 1px solid var(--input-border); font-size: 0.85rem; box-shadow: var(--shadow); opacity: 0; pointer-events: none; transition: opacity 0.4s; max-width: 90%; text-align: center; }
+        #toast.show { opacity: 1; }
+        .stat-title { font-size: 0.8rem; color: var(--text-sec); text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .stat-card { padding: 16px 10px; display: flex; flex-direction: column; gap: 4px; align-items: center; text-align: center; }
+        .stat-card span:first-child { font-size: 0.8rem; color: var(--text-sec); }
+        .stat-card span:last-child { font-size: 1.25rem; font-weight: 700; }
+    </style>
+</head>
+<body data-theme="dark">
+
+    <!-- SPLASH -->
+    <div id="splash-screen" class="flex-center">
+        <div class="logo">GradeFlow</div>
+        <button class="btn splash-btn primary" onclick="app.start()">Старт</button>
+        <button class="btn splash-btn" onclick="app.openModal('settings')">Настройки</button>
+    </div>
+
+    <!-- APP CONTAINER -->
+    <div id="app-container" class="hidden">
+        
+        <!-- Header -->
+        <header>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <button class="icon-btn" onclick="app.openSidebar()" title="Меню">
+                    <svg class="svg-icon" viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+                </button>
+                <button class="icon-btn" onclick="app.openModal('history')" title="История">
+                    <svg class="svg-icon" viewBox="0 0 24 24"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
+                </button>
+            </div>
+            
+            <div class="date-navigator">
+                <button class="icon-btn" onclick="app.changeDate(-1)">
+                    <svg class="svg-icon" viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+                </button>
+                
+                <!-- Сделали текст кликабельным и добавили скрытый инпут календаря -->
+                <div style="position: relative; display: inline-block;">
+                    <span class="date-display" id="current-date-display" onclick="app.openDatePicker()" style="cursor: pointer;" title="Выбрать дату">Сегодня</span>
+                    <input type="date" id="native-date-picker" style="position: absolute; top: 0; left: 0; opacity: 0; pointer-events: none; width: 100%; height: 100%;" onchange="app.onDatePicked(this)">
+                </div>
+
+                <button class="icon-btn" onclick="app.changeDate(1)">
+                    <svg class="svg-icon" viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+                </button>
+            </div>
+
+            <div style="display: flex; gap: 8px;">
+                <button class="icon-btn" onclick="app.openModal('statistics')" title="Статистика">
+                    <svg class="svg-icon" viewBox="0 0 24 24"><path d="M10 20h4V4h-4v16zm-6 0h4v-8H4v8zM16 9v11h4V9h-4z"/></svg>
+                </button>
+                <button class="icon-btn" onclick="app.openModal('notes')" title="Заметки">
+                    <svg class="svg-icon" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- New Top Analytics Bar -->
+        <div class="top-analytics-bar">
+            <div class="ana-box" style="align-items:flex-start;">
+                <span>Финиш:</span>
+                <span class="ana-val" id="top-predict">---</span>
+            </div>
+            <div class="ana-box" style="align-items:flex-end; width:auto; flex:1;">
+                <span>В неделю:</span>
+                <span class="ana-val" id="top-speed">0 ₸</span>
+            </div>
+        </div>
+
+        <!-- Dashboard -->
+        <div class="dashboard">
+            <div class="progress-container glass">
+                <svg class="circle-chart" viewBox="0 0 36 36">
+                  <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop id="grad-stop-1" offset="0%" stop-color="#00c6ff" />
+                    <stop id="grad-stop-2" offset="100%" stop-color="#0072ff" />
+                  </linearGradient>
+                  <circle class="circle-bg" cx="18" cy="18" r="15.5" />
+                  <circle class="circle-bar" id="progress-circle" stroke-dasharray="0, 100" cx="18" cy="18" r="15.5" />
+                </svg>
+                <div class="balance-info">
+                    <div class="balance-label">Доступный баланс</div>
+                    <div class="balance-amount" id="main-balance">0</div>
+                    <div class="currency">Тенге</div>
+                    <div id="piggy-balance" style="font-size: 0.8rem; color: var(--text-sec); margin-top: 4px; opacity: 0.75;">(В копилке: 0 ₸)</div>
+                    <div class="goal-percent" id="goal-percent">0% цели</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Wallet Filter Tabs -->
+            <div class="wallet-tabs-container" id="wallet-tabs">
+                <button class="wallet-tab active" data-wallet="all" onclick="app.setWalletFilter('all', this)">Все</button>
+                <button class="wallet-tab" data-wallet="kaspi" onclick="app.setWalletFilter('kaspi', this)">Kaspi</button>
+                <button class="wallet-tab" data-wallet="halyk" onclick="app.setWalletFilter('halyk', this)">Halyk</button>
+                <button class="wallet-tab" data-wallet="freedom" onclick="app.setWalletFilter('freedom', this)">Freedom</button>
+                <button class="wallet-tab" data-wallet="other" onclick="app.setWalletFilter('other', this)">Наличные</button>
+            </div>
+
+        <!-- Controls Zone -->
+        <div class="controls-zone">
+            <!-- Manual Input with Toggle and OK -->
+            <div class="manual-input-group">
+                <button id="tx-mode-btn" class="btn mode-toggle" onclick="app.toggleTxMode()">+</button>
+                <input type="number" id="manual-amount" class="input-field" placeholder="0" inputmode="numeric" onkeydown="if(event.key === 'Enter') app.commitTransaction()">
+                <button class="btn btn-ok" onclick="app.commitTransaction()">
+                    <svg class="svg-icon" style="width:20px;height:20px;" viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>
+                </button>
+            </div>
+
+            <!-- Comment & Wallet Inputs -->
+            <div style="display: flex; gap: 10px; width: 100%;">
+                <input type="text" id="manual-comment" class="input-field" placeholder="Комментарий..." style="text-align: left; font-weight: 400; font-size: 0.95rem; flex: 1;" onkeydown="if(event.key === 'Enter') app.commitTransaction()">
+                <select id="manual-wallet" class="input-field" style="max-width: 120px; font-size: 0.95rem; text-align: left; padding: 10px; background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-main);">
+                    <option value="freedom">Freedom</option>
+                    <option value="halyk">Halyk</option>
+                    <option value="kaspi">Kaspi</option>
+                    <option value="other">Наличные</option>
+                </select>
+            </div>
+
+            <!-- Quick Buttons (Accumulators) 3x3 Grid -->
+            <div class="quick-add-grid">
+                <button class="btn quick-btn" onclick="app.addToInput(100)">100</button>
+                <button class="btn quick-btn" onclick="app.addToInput(200)">200</button>
+                <button class="btn quick-btn" onclick="app.addToInput(300)">300</button>
+                <button class="btn quick-btn" onclick="app.addToInput(400)">400</button>
+                <button class="btn quick-btn" onclick="app.addToInput(500)">500</button>
+                <button class="btn quick-btn" onclick="app.addToInput(600)">600</button>
+                <button class="btn quick-btn" onclick="app.addToInput(700)">700</button>
+                <button class="btn quick-btn" onclick="app.addToInput(800)">800</button>
+                <button class="btn quick-btn" onclick="app.addToInput(900)">900</button>
+            </div>
+
+            <!-- Day Logic -->
+            <div class="day-actions">
+                <button class="btn action-btn" style="background: rgba(255, 75, 75, 0.1); border: 1px solid rgba(255, 75, 75, 0.2); color: var(--danger);" onclick="app.clearInput()">Очистить</button>
+                <button class="btn action-btn" style="background: rgba(0, 198, 255, 0.12); border: 1px solid rgba(0, 198, 255, 0.25); color: var(--accent-start);" onclick="app.quickCashback()">Кэшбек</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SIDEBAR (MENU) -->
+    <div id="overlay" onclick="app.closeSidebar()"></div>
+    <div id="sidebar">
+        <div class="sidebar-header">Меню</div>
+        
+        <button class="btn btn-sidebar-link" onclick="app.closeSidebar(); app.openModal('settings')">
+            ⚙️ Открыть Настройки
+        </button>
+
+        <button class="btn btn-reset" onclick="app.initiateConfirm('reset')">Сбросить ВСЁ</button>
+    </div>
+
+    <!-- SETTINGS MODAL -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-header">
+            <h3>Настройки</h3>
+            <button class="icon-btn" onclick="app.closeModal('settings')">&times;</button>
+        </div>
+        <div class="modal-content" style="display: flex; flex-direction: column; gap: 20px;">
+            <div class="setting-item toggle-row">
+                <span class="setting-label">Темная тема</span>
+                <label class="switch">
+                    <input type="checkbox" id="theme-toggle" onchange="app.toggleTheme()">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="setting-item">
+                <span class="setting-label">Цель (Тенге)</span>
+                <input type="number" id="goal-input" class="input-field" style="text-align:left; background: rgba(255,255,255,0.05);" onchange="app.saveSettings()">
+            </div>
+
+            <div class="setting-item">
+                <span class="setting-label">Начальный капитал</span>
+                <input type="number" id="start-bal-input" class="input-field" style="text-align:left; background: rgba(255,255,255,0.05);" onchange="app.saveSettings()">
+            </div>
+
+            <div class="setting-item">
+                <span class="setting-label">Отчисления в копилку (%)</span>
+                <input type="number" id="piggy-percent-input" class="input-field" style="text-align:left; background: rgba(255,255,255,0.05);" min="0" max="100" onchange="app.saveSettings()">
+            </div>
+
+            <!-- Custom Backup section inside settings -->
+            <div class="glass" style="padding: 15px; margin-top: 10px; display: flex; flex-direction: column; gap: 12px; border: 1px solid rgba(255,255,255,0.05);">
+                <span class="setting-label" style="font-weight: 600;">Резервное копирование</span>
+                
+                <input type="text" id="export-filename-input" class="input-field" placeholder="Имя файла (необязательно)" style="text-align:left; font-size: 0.9rem; padding: 10px; background: rgba(0,0,0,0.2);">
+                
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-sidebar-link" style="flex: 1; text-align: center; margin: 0; background: rgba(0,198,255,0.15); color: var(--accent-start);" onclick="app.exportBackup()">
+                        Экспорт
+                    </button>
+                    <button class="btn btn-sidebar-link" style="flex: 1; text-align: center; margin: 0;" onclick="document.getElementById('import-file-input').click()">
+                        Импорт
+                    </button>
+                </div>
+                <input type="file" id="import-file-input" style="display: none;" accept=".json" onchange="app.importBackup(event)">
+            </div>
+        </div>
+    </div>
+
+    <!-- NOTES MODAL -->
+    <div id="notes-modal" class="modal">
+        <div class="modal-header">
+            <h3>Заметки</h3>
+            <button class="icon-btn" onclick="app.closeModal('notes')">&times;</button>
+        </div>
+        <div class="modal-content">
+            <textarea id="notes-area" style="width:100%; height:100%; background:transparent; border:none; color:var(--text-main); font-size:1.1rem; resize:none; outline:none;" placeholder="Ваши записи..." oninput="app.saveNotes()"></textarea>
+        </div>
+    </div>
+
+    <!-- TRANSFER MODAL -->
+    <div id="transfer-modal" class="modal">
+        <div class="modal-header">
+            <h3>Перевод между счетами</h3>
+            <button class="icon-btn" onclick="app.closeModal('transfer')">&times;</button>
+        </div>
+        <div class="modal-content" style="display: flex; flex-direction: column; gap: 16px;">
+            <div class="setting-item">
+                <span class="setting-label">Сумма перевода</span>
+                <input type="number" id="tr-amount" class="input-field" placeholder="0" inputmode="numeric" style="text-align: left; font-size: 1.2rem; font-weight: 700;">
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <div class="setting-item" style="flex: 1;">
+                    <span class="setting-label">Откуда</span>
+                    <select id="tr-from-wallet" class="input-field" style="width: 100%; padding: 10px; background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-main);">
+                        <option value="freedom">Freedom</option>
+                        <option value="halyk">Halyk</option>
+                        <option value="kaspi">Kaspi</option>
+                        <option value="other">Наличные</option>
+                    </select>
+                </div>
+                <div class="setting-item" style="flex: 1;">
+                    <span class="setting-label">Куда</span>
+                    <select id="tr-to-wallet" class="input-field" style="width: 100%; padding: 10px; background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-main);">
+                        <option value="halyk">Halyk</option>
+                        <option value="freedom">Freedom</option>
+                        <option value="kaspi">Kaspi</option>
+                        <option value="other">Наличные</option>
+                    </select>
+                </div>
+            </div>
+            <div class="setting-item">
+                <span class="setting-label">Комментарий (необязательно)</span>
+                <input type="text" id="tr-comment" class="input-field" placeholder="Доп. заметка..." style="text-align: left;">
+            </div>
+            <button class="btn btn-ok" style="margin-top: 10px; padding: 14px; border-radius: 12px;" onclick="app.executeModalTransfer()">
+                Выполнить перевод
+            </button>
+        </div>
+    </div>
+
+    <!-- HISTORY MODAL -->
+    <div id="history-modal" class="modal">
+        <div class="modal-header">
+            <h3>История</h3>
+            <button class="icon-btn" onclick="app.closeModal('history')">&times;</button>
+        </div>
+        <div class="modal-content" style="display: flex; flex-direction: column;">
+            <!-- Filter Controls -->
+            <div class="history-filters glass" style="padding: 12px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px;">
+                <!-- Type Filter Buttons -->
+                <div style="display: flex; gap: 8px; width: 100%;">
+                    <button class="btn filter-type-btn" id="filter-type-all" style="flex: 1; padding: 8px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; background: var(--accent-start); color: white;" onclick="app.setHistoryTypeFilter('all')">Все</button>
+                    <button class="btn filter-type-btn" id="filter-type-income" style="flex: 1; padding: 8px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; background: rgba(255,255,255,0.05); color: var(--text-sec);" onclick="app.setHistoryTypeFilter('income')">Доходы</button>
+                    <button class="btn filter-type-btn" id="filter-type-expense" style="flex: 1; padding: 8px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; background: rgba(255,255,255,0.05); color: var(--text-sec);" onclick="app.setHistoryTypeFilter('expense')">Расходы</button>
+                </div>
+                
+                <div style="display: flex; gap: 8px; width: 100%;">
+                    <button class="btn filter-type-btn" id="filter-type-transfer" style="flex: 1; padding: 8px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; background: rgba(255,255,255,0.05); color: var(--text-sec);" onclick="app.setHistoryTypeFilter('transfer')">Переводы</button>
+                    <button class="btn filter-type-btn" id="filter-type-cashback" style="flex: 1; padding: 8px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; background: rgba(255,255,255,0.05); color: var(--text-sec);" onclick="app.setHistoryTypeFilter('cashback')">Кэшбек</button>
+                    <select id="history-sort" class="input-field" style="flex: 1.4; padding: 8px; font-size: 0.8rem; font-weight: 500; height: 36px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-main);" onchange="app.renderHistoryList()">
+                        <option value="new">Новые сверху</option>
+                        <option value="old">Старые сверху</option>
+                        <option value="big">Крупные сверху</option>
+                    </select>
+                </div>
+                <input id="history-search" type="text" class="input-field" placeholder="Поиск: слово, 100, >1000, 28.10" style="width: 100%; padding: 8px 12px; font-size: 0.85rem; height: 36px; text-align: left; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-main);" oninput="app.renderHistoryList()">
+
+                <!-- Period & Wallet Dropdowns -->
+                <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+                    <div style="display: flex; gap: 8px; width: 100%;">
+                        <select id="filter-month-select" class="input-field" style="flex: 1; padding: 8px; font-size: 0.85rem; font-weight: 500; height: 36px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-main);" onchange="app.setHistoryPeriodFilter()">
+                            <option value="all">Все месяцы</option>
+                            <option value="01">Январь</option>
+                            <option value="02">Февраль</option>
+                            <option value="03">Март</option>
+                            <option value="04">Апрель</option>
+                            <option value="05">Май</option>
+                            <option value="06">Июнь</option>
+                            <option value="07">Июль</option>
+                            <option value="08">Август</option>
+                            <option value="09">Сентябрь</option>
+                            <option value="10">Октябрь</option>
+                            <option value="11">Ноябрь</option>
+                            <option value="12">Декабрь</option>
+                        </select>
+                        <select id="filter-year-select" class="input-field" style="flex: 1; padding: 8px; font-size: 0.85rem; font-weight: 500; height: 36px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-main);" onchange="app.setHistoryPeriodFilter()">
+                            <option value="all">Все года</option>
+                        </select>
+                    </div>
+                    <select id="filter-wallet-select" class="input-field" style="width: 100%; padding: 8px; font-size: 0.85rem; font-weight: 500; height: 36px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-main);" onchange="app.setHistoryPeriodFilter()">
+                        <option value="all">Все счета</option>
+                        <option value="freedom">Freedom</option>
+                        <option value="halyk">Halyk</option>
+                        <option value="kaspi">Kaspi</option>
+                        <option value="other">Наличные</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Aesthetic Subtle Clear History Button -->
+            <div style="display:flex; justify-content:space-between; gap:8px; margin-bottom:10px;">
+                <div style="display:flex; gap:8px;">
+                    <button id="merge-toggle-btn" class="btn" style="padding: 6px 12px; border-radius: 8px; background: rgba(0,198,255,0.1); border: 1px solid rgba(0,198,255,0.25); color: var(--accent-start); font-size: 0.8rem; font-weight: 500;" onclick="app.toggleMergeMode()">Объединить</button>
+                    <button id="merge-confirm-btn" class="btn hidden" style="padding: 6px 12px; border-radius: 8px; background: linear-gradient(135deg, var(--accent-start), var(--accent-end)); color: white; font-size: 0.8rem; font-weight: 600;" onclick="app.mergeSelected()">В перевод</button>
+                </div>
+                <button class="btn" style="padding: 6px 12px; border-radius: 8px; background: rgba(255, 75, 75, 0.08); border: 1px solid rgba(255, 75, 75, 0.15); color: #ff6b6b; font-size: 0.8rem; font-weight: 500; transition: var(--transition);" onclick="app.initiateConfirm('clearHistory')" onmouseover="this.style.background='rgba(255, 75, 75, 0.15)'" onmouseout="this.style.background='rgba(255, 75, 75, 0.08)'">
+                    Очистить историю
+                </button>
+            </div>
+            
+            <div style="position: relative; flex: 1; display: flex; flex-direction: column; overflow: hidden;">
+    <div id="history-list" style="flex: 1; overflow-y: auto; padding-right: 14px;">
+        <!-- JS Populates -->
+    </div>
+    <!-- Виртуальный трек и ползунок -->
+    <div id="custom-scroll-track" style="position: absolute; right: 0; top: 0; bottom: 0; width: 14px; background: transparent; pointer-events: none; z-index: 10; display: none;">
+        <div id="custom-scroll-thumb" style="position: absolute; width: 6px; right: 4px; top: 0; background: rgba(255,255,255,0.15); border-radius: 10px; pointer-events: auto; cursor: grab; min-height: 30px; transition: background-color 0.2s;"></div>
+    </div>
+</div>
+        </div>
+    </div>
+
+    <!-- STATISTICS MODAL -->
+    <div id="statistics-modal" class="modal">
+        <div class="modal-header">
+            <h3>Статистика</h3>
+            <button class="icon-btn" onclick="app.closeModal('statistics')">&times;</button>
+        </div>
+        <div class="modal-content">
+            <div class="stats-container" style="display: flex; flex-direction: column; gap: 14px; padding-top: 10px;">
+                <div class="stat-title">Общие финансы</div>
+                <div class="stat-grid">
+                    <div class="stat-card glass"><span>Валовый доход</span><span id="stat-total-income" style="color: var(--success);">0 ₸</span></div>
+                    <div class="stat-card glass"><span>Всего расходов</span><span id="stat-total-expense" style="color: var(--danger);">0 ₸</span></div>
+                </div>
+                <div class="stat-card glass"><span>Чистый результат</span><span id="stat-net" style="">0 ₸</span></div>
+                <div class="stat-card glass"><span>Последние 30 дней</span><span id="stat-30-net" style="font-size: 1.25rem; font-weight: 700;">0 ₸</span><span id="stat-30-detail" style="font-size: 0.8rem; font-weight: 400; color: var(--text-sec);"></span></div>
+                <div class="stat-title">Кэшбек</div>
+                <div class="stat-grid">
+                    <div class="stat-card glass"><span>Валовый кэшбек</span><span id="stat-cb-total" style="color: var(--accent-start);">0 ₸</span></div>
+                    <div class="stat-card glass"><span>В активный месяц</span><span id="stat-cb-month" style="">0 ₸</span></div>
+                </div>
+                <div class="stat-card glass"><span>В неделю (в среднем)</span><span id="stat-cb-week" style="">0 ₸</span></div>
+                <div class="stat-grid">
+                    <div class="stat-card glass"><span>Потрачено кэшбека</span><span id="stat-cb-spent" style="color: var(--danger);">0 ₸</span></div>
+                    <div class="stat-card glass"><span>Свободный кэшбек</span><span id="stat-cb-free" style="color: var(--success);">0 ₸</span></div>
+                </div>
+                <button class="btn btn-sidebar-link" style="text-align: center;" onclick="app.openModal('summary')">Сводка текстом</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SUMMARY MODAL -->
+    <div id="summary-modal" class="modal">
+        <div class="modal-header">
+            <h3>Сводка</h3>
+            <button class="icon-btn" onclick="app.closeModal('summary')">&times;</button>
+        </div>
+        <div class="modal-content" style="display: flex; flex-direction: column; gap: 12px;">
+            <select id="summary-period" class="input-field" style="flex: none; text-align: left;" onchange="app.buildSummary()">
+                <option value="all">За всё время</option>
+                <option value="month">Этот месяц</option>
+                <option value="30">Последние 30 дней</option>
+                <option value="90">Последние 90 дней</option>
+            </select>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-ok" style="flex: 1; padding: 12px;" onclick="app.copySummary(this)">Копировать</button>
+                <button class="btn btn-sidebar-link" style="flex: 1; text-align: center;" onclick="app.downloadSummary()">Скачать .txt</button>
+            </div>
+            <textarea id="summary-text" readonly style="flex: 1; min-height: 0; width: 100%; background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 10px; color: var(--text-main); padding: 12px; font-size: 0.85rem; font-family: monospace; resize: none; outline: none;"></textarea>
+            
+        </div>
+    </div>
+
+    <!-- CONFIRMATION POPUP -->
+    <div id="confirm-modal" class="confirm-popup">
+        <h3 id="confirm-title" style="margin-bottom:10px;">Вы уверены?</h3>
+        <p id="confirm-text" style="color:var(--text-sec); font-size:0.9rem;">Это действие нельзя отменить.</p>
+        <div class="confirm-actions">
+            <button class="btn" style="padding:10px 20px; border-radius:8px; background:#333; color:white;" onclick="app.cancelConfirm()">Отмена</button>
+            <button id="confirm-yes-btn" class="btn" style="padding:10px 20px; border-radius:8px; background:var(--danger); color:white;">Да</button>
+        </div>
+    </div>
+
+    <div id="toast"></div>
+    <script>
+        const app = {
+            data: {
+                currentDate: "",
+                initialBalance: 0,
+                goal: 100000,
+                transactions: [], 
+                notes: "",
+                settings: { theme: 'dark', piggyBankPercent: 0 }
+            },
+            ui: {
+                txMode: 'income', 
+                confirmType: null,
+                resetStep: 0,
+                activeWallet: 'all',
+                mergeMode: false,
+                mergeIds: []
+            },
+
+            // Timezone helper to prevent parsing strings as UTC
+            parseLocalDate: function(dateStr) {
+                const parts = dateStr.split('-');
+                return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+            },
+            escapeHtml: function(str) {
+                return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            },
+            walletLabel: function(key) {
+                const names = { freedom: 'Freedom', halyk: 'Halyk', kaspi: 'Kaspi', other: 'Наличные' };
+                return names[key] || key;
+            },
+            toISODateStr: function(dateObj) {
+                const y = dateObj.getFullYear();
+                const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+                const d = String(dateObj.getDate()).padStart(2, '0');
+                return `${y}-${m}-${d}`;
+            },
+            
+            updateCustomScrollbar: function() {
+                const list = document.getElementById('history-list');
+                const track = document.getElementById('custom-scroll-track');
+                const thumb = document.getElementById('custom-scroll-thumb');
+                if (!list || !track || !thumb) return;
+
+                const scrollHeight = list.scrollHeight;
+                const clientHeight = list.clientHeight;
+                const scrollTop = list.scrollTop;
+
+                if (scrollHeight <= clientHeight) {
+                    track.style.display = 'none';
+                    return;
+                } else {
+                    track.style.display = 'block';
+                }
+
+                const thumbHeight = Math.max(30, (clientHeight / scrollHeight) * clientHeight);
+                thumb.style.height = thumbHeight + 'px';
+
+                const maxScrollTop = scrollHeight - clientHeight;
+                const maxThumbTop = clientHeight - thumbHeight;
+                const thumbTop = (scrollTop / maxScrollTop) * maxThumbTop;
+                thumb.style.top = thumbTop + 'px';
+            },
+
+            initCustomScrollbarEvents: function() {
+                const list = document.getElementById('history-list');
+                const thumb = document.getElementById('custom-scroll-thumb');
+                if (!list || !thumb) return;
+
+                let isDragging = false;
+                let startY = 0;
+                let startScrollTop = 0;
+
+                const onStart = (e) => {
+                    isDragging = true;
+                    thumb.style.backgroundColor = 'rgba(255,255,255,0.4)';
+                    document.body.style.userSelect = 'none';
+                    
+                    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                    startY = clientY;
+                    startScrollTop = list.scrollTop;
+                    
+                    e.stopPropagation();
+                };
+
+                const onMove = (e) => {
+                    if (!isDragging) return;
+                    
+                    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                    const deltaY = clientY - startY;
+
+                    const scrollHeight = list.scrollHeight;
+                    const clientHeight = list.clientHeight;
+                    const thumbHeight = thumb.offsetHeight;
+                    
+                    const maxScrollTop = scrollHeight - clientHeight;
+                    const maxThumbTop = clientHeight - thumbHeight;
+
+                    const scrollRatio = maxScrollTop / maxThumbTop;
+                    list.scrollTop = startScrollTop + deltaY * scrollRatio;
+                    
+                    e.preventDefault();
+                    e.stopPropagation();
+                };
+
+                const onEnd = () => {
+                    if (!isDragging) return;
+                    isDragging = false;
+                    thumb.style.backgroundColor = 'rgba(255,255,255,0.15)';
+                    document.body.style.userSelect = '';
+                };
+
+                // События для сенсорного экрана телефона
+                thumb.addEventListener('touchstart', onStart, { passive: false });
+                window.addEventListener('touchmove', onMove, { passive: false });
+                window.addEventListener('touchend', onEnd);
+
+                // События для мыши ПК
+                thumb.addEventListener('mousedown', onStart);
+                window.addEventListener('mousemove', onMove);
+                window.addEventListener('mouseup', onEnd);
+
+                list.addEventListener('scroll', () => app.updateCustomScrollbar());
+            },
+            
+            initBtnLongPress: function() {
+                const btn = document.getElementById('tx-mode-btn');
+                if (!btn) return;
+                let timer = null;
+                let isLongPress = false;
+
+                const startPress = () => {
+                    isLongPress = false;
+                    timer = setTimeout(() => {
+                        isLongPress = true;
+                        if (navigator.vibrate) navigator.vibrate(40);
+                        app.openTransferModal();
+                    }, 600);
+                };
+
+                const cancelPress = () => {
+                    if (timer) clearTimeout(timer);
+                };
+
+                btn.addEventListener('touchstart', startPress, { passive: true });
+                btn.addEventListener('touchend', (e) => {
+                    cancelPress();
+                    if (isLongPress) e.preventDefault();
+                });
+                btn.addEventListener('touchmove', cancelPress);
+
+                btn.addEventListener('mousedown', startPress);
+                btn.addEventListener('mouseup', cancelPress);
+                btn.addEventListener('mouseleave', cancelPress);
+
+                const originalToggle = this.toggleTxMode.bind(this);
+                this.toggleTxMode = function() {
+                    if (isLongPress) {
+                        isLongPress = false;
+                        return;
+                    }
+                    originalToggle();
+                };
+            },
+
+            init: function() {
+                // Aggressive auto-migration from older keys
+                if (!localStorage.getItem('gradeflow_v3')) {
+                    let migratedData = null;
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const key = localStorage.key(i);
+                        if (key === 'gradeflow_v3') continue;
+                        if (!/^gradeflow/i.test(key)) continue; // не трогаем чужие данные на том же адресе
+                        const value = localStorage.getItem(key);
+                        if (!value) continue;
+                        try {
+                            const parsed = JSON.parse(value);
+                            if (parsed && typeof parsed === 'object') {
+                                if (Array.isArray(parsed)) {
+                                    migratedData = {
+                                        currentDate: this.toISODateStr(new Date()),
+                                        initialBalance: 0,
+                                        goal: 100000,
+                                        transactions: parsed,
+                                        notes: "",
+                                        settings: { theme: 'dark', piggyBankPercent: 0 }
+                                    };
+                                } else {
+                                    migratedData = {
+                                        currentDate: parsed.currentDate || this.toISODateStr(new Date()),
+                                        initialBalance: parsed.initialBalance || 0,
+                                        goal: parsed.goal || 100000,
+                                        transactions: parsed.transactions || [],
+                                        notes: parsed.notes || "",
+                                        settings: parsed.settings || { theme: 'dark', piggyBankPercent: 0 }
+                                    };
+                                }
+                                break;
+                            }
+                        } catch (e) {}
+                    }
+                    if (migratedData) {
+                        if (migratedData.transactions) {
+                            migratedData.transactions.forEach(tx => {
+                                if (tx.comment === undefined) tx.comment = "";
+                                if (tx.piggyAmount === undefined) tx.piggyAmount = 0;
+                                if (tx.wallet === undefined) tx.wallet = "freedom";
+                            });
+                        }
+                        localStorage.setItem('gradeflow_v3', JSON.stringify(migratedData));
+                    }
+                }
+
+                const saved = localStorage.getItem('gradeflow_v3');
+                if (saved) {
+                    try {
+                        const parsed = JSON.parse(saved);
+                        this.data = { ...this.data, ...parsed };
+                    } catch (e) {
+                        console.error("Failed to parse saved data", e);
+                    }
+                }
+
+                // Default session date is always set to Calendar "Today" upon initialization
+                this.data.currentDate = this.toISODateStr(new Date());
+
+                if (!this.data.settings) this.data.settings = {};
+                if (this.data.settings.theme === undefined) this.data.settings.theme = 'dark';
+                if (this.data.settings.piggyBankPercent === undefined) this.data.settings.piggyBankPercent = 0;
+                if (!Array.isArray(this.data.settings.excludedWallets)) this.data.settings.excludedWallets = [];
+
+                if (this.data.transactions) {
+                    this.data.transactions.forEach(tx => {
+                        if (tx.comment === undefined) tx.comment = "";
+                        if (tx.piggyAmount === undefined) tx.piggyAmount = 0;
+                        if (tx.wallet === undefined) tx.wallet = "freedom";
+                    });
+                }
+                
+                this.initCustomScrollbarEvents();
+                
+                this.applyTheme();
+                
+                // Set Inputs inside Settings Modal
+                document.getElementById('goal-input').value = this.data.goal;
+                document.getElementById('start-bal-input').value = this.data.initialBalance;
+                document.getElementById('piggy-percent-input').value = this.data.settings.piggyBankPercent;
+                document.getElementById('notes-area').value = this.data.notes;
+
+                this.initBtnLongPress();
+                this.initWalletLongPress();
+                this.remindAboutEntries();
+
+                this.renderUI();
+            },
+
+            start: function() {
+                document.getElementById('splash-screen').classList.add('hidden');
+                document.getElementById('app-container').classList.remove('hidden');
+            },
+
+            saveData: function() {
+                try {
+                    localStorage.setItem('gradeflow_v3', JSON.stringify(this.data));
+                } catch (e) {
+                    console.error('Не удалось сохранить данные', e);
+                    alert('Не удалось сохранить данные (память браузера недоступна или переполнена). Сделай экспорт в настройках!');
+                }
+                this.renderUI();
+            },
+
+            // --- MATH & LOGIC ---
+            // walletKey: 'all' | 'freedom' | 'halyk' | 'kaspi' | 'other'. Без аргумента берётся активная вкладка.
+            getAvailableBalance: function(walletKey) {
+                const activeW = walletKey || this.ui.activeWallet || 'all';
+                
+                const txSum = this.data.transactions.reduce((acc, tx) => {
+                    if (activeW !== 'all' && tx.wallet !== activeW) return acc;
+                    if (activeW === 'all' && this.isExcluded(tx.wallet)) return acc;
+
+                    if (tx.type === 'income') {
+                        const piggy = tx.piggyAmount || 0;
+                        return acc + (tx.amount - piggy);
+                    } else if (tx.type === 'expense') {
+                        return acc - tx.amount;
+                    } else if (tx.type === 'transfer') {
+                    
+                        if (tx.transferDirection === 'out') {
+                            return acc - tx.amount;
+                        } else if (tx.transferDirection === 'in') {
+                            return acc + tx.amount;
+                        }
+                    }
+                    return acc;
+                }, 0);
+
+                const baseBal = activeW === 'all' ? (parseInt(this.data.initialBalance) || 0) : 0;
+                return baseBal + txSum;
+            },
+
+            getPiggyBalance: function() {
+                return this.data.transactions.reduce((acc, tx) => {
+                    if (tx.type === 'income') {
+                        return acc + (tx.piggyAmount || 0);
+                    }
+                    return acc;
+                }, 0);
+            },
+
+            addToInput: function(val) {
+                const input = document.getElementById('manual-amount');
+                let current = parseInt(input.value);
+                if(isNaN(current)) current = 0;
+                input.value = current + val;
+            },
+
+            clearInput: function() {
+                const amountInput = document.getElementById('manual-amount');
+                const commentInput = document.getElementById('manual-comment');
+                
+                if (amountInput) amountInput.value = '';
+                if (commentInput) commentInput.value = '';
+            },
+
+            toggleTxMode: function() {
+                const btn = document.getElementById('tx-mode-btn');
+                if(this.ui.txMode === 'income') {
+                    this.ui.txMode = 'expense';
+                    btn.innerText = '-';
+                    btn.classList.add('expense');
+                } else {
+                    this.ui.txMode = 'income';
+                    btn.innerText = '+';
+                    btn.classList.remove('expense');
+                }
+            },
+
+            commitTransaction: function() {
+                const input = document.getElementById('manual-amount');
+                const val = parseInt(input.value);
+                if(!val || val <= 0) return;
+
+                const commentInput = document.getElementById('manual-comment');
+                const commentVal = commentInput ? commentInput.value.trim() : '';
+                
+                const walletSelect = document.getElementById('manual-wallet');
+                const walletVal = walletSelect ? walletSelect.value : 'freedom';
+
+                const percent = (this.data.settings && this.data.settings.piggyBankPercent) || 0;
+                const piggyVal = this.ui.txMode === 'income' ? Math.round(val * percent / 100) : 0;
+
+                this.data.transactions.push({
+                    id: Date.now(),
+                    date: this.data.currentDate,
+                    amount: val,
+                    type: this.ui.txMode,
+                    comment: commentVal,
+                    piggyAmount: piggyVal,
+                    wallet: walletVal
+                });
+                
+                input.value = '';
+                if (commentInput) commentInput.value = '';
+                this.saveData();
+            },
+
+            quickCashback: function() {
+                const input = document.getElementById('manual-amount');
+                const val = parseInt(input.value);
+                if(!val || val <= 0) {
+                    alert('Сначала введи сумму кэшбека!');
+                    return;
+                }
+
+                this.ui.txMode = 'income';
+                const modeBtn = document.getElementById('tx-mode-btn');
+                if (modeBtn) {
+                    modeBtn.innerText = '+';
+                    modeBtn.classList.remove('expense');
+                }
+
+                const commentInput = document.getElementById('manual-comment');
+                const rawComment = commentInput ? commentInput.value.trim() : '';
+                const finalComment = rawComment ? `Кэшбек | ${rawComment}` : 'Кэшбек';
+
+                const percent = (this.data.settings && this.data.settings.piggyBankPercent) || 0;
+                const piggyVal = Math.round(val * percent / 100);
+
+                this.data.transactions.push({
+                    id: Date.now(),
+                    date: this.data.currentDate,
+                    amount: val,
+                    type: 'income',
+                    comment: finalComment,
+                    piggyAmount: piggyVal,
+                    wallet: 'freedom',
+                    isCashback: true
+                });
+                
+                input.value = '';
+                if (commentInput) commentInput.value = '';
+                this.saveData();
+            },
+
+            getWalletNamePhrase: function(walletKey, direction) {
+                const names = {
+                    freedom: { from: 'С Фридома', to: 'На Фридом' },
+                    halyk: { from: 'С Халыка', to: 'На Халык' },
+                    kaspi: { from: 'С Каспи', to: 'На Каспи' },
+                    other: { from: 'С Налички', to: 'В наличку' }
+                };
+                const conf = names[walletKey] || { from: walletKey, to: walletKey };
+                return direction === 'from' ? conf.from : conf.to;
+            },
+
+            openTransferModal: function() {
+                const mainAmount = document.getElementById('manual-amount');
+                const trAmount = document.getElementById('tr-amount');
+                if (mainAmount && trAmount && mainAmount.value) {
+                    trAmount.value = mainAmount.value;
+                }
+                const active = this.ui.activeWallet !== 'all' ? this.ui.activeWallet : 'freedom';
+                document.getElementById('tr-from-wallet').value = active;
+                document.getElementById('tr-to-wallet').value = active === 'halyk' ? 'freedom' : 'halyk';
+                this.openModal('transfer');
+            },
+
+            executeModalTransfer: function() {
+                const amountInput = document.getElementById('tr-amount');
+                const amount = parseInt(amountInput.value);
+                const fromWallet = document.getElementById('tr-from-wallet').value;
+                const toWallet = document.getElementById('tr-to-wallet').value;
+                const noteInput = document.getElementById('tr-comment');
+                const note = noteInput ? noteInput.value.trim() : '';
+
+                if (!amount || amount <= 0) {
+                    alert('Введите сумму перевода');
+                    return;
+                }
+                if (fromWallet === toWallet) {
+                    alert('Выберите разные счета для перевода');
+                    return;
+                }
+
+                this.createTransfer(amount, fromWallet, toWallet, this.data.currentDate, note);
+                
+                amountInput.value = '';
+                if (noteInput) noteInput.value = '';
+                const mainAmount = document.getElementById('manual-amount');
+                if (mainAmount) mainAmount.value = '';
+                
+                this.closeModal('transfer');
+            },
+
+            createTransfer: function(amount, fromWallet, toWallet, dateStr, extraNote) {
+                if (!amount || amount <= 0) return;
+                const transferId = 'tr_' + Date.now();
+                const baseDate = dateStr || this.data.currentDate;
+
+                const outText = this.getWalletNamePhrase(toWallet, 'to') + (extraNote ? ` | ${extraNote}` : '');
+                const inText = this.getWalletNamePhrase(fromWallet, 'from') + (extraNote ? ` | ${extraNote}` : '');
+
+                this.data.transactions.push({
+                    id: Date.now(),
+                    transferId: transferId,
+                    date: baseDate,
+                    amount: amount,
+                    type: 'transfer',
+                    transferDirection: 'out',
+                    wallet: fromWallet,
+                    targetWallet: toWallet,
+                    comment: outText,
+                    piggyAmount: 0
+                });
+
+                this.data.transactions.push({
+                    id: Date.now() + 1,
+                    transferId: transferId,
+                    date: baseDate,
+                    amount: amount,
+                    type: 'transfer',
+                    transferDirection: 'in',
+                    wallet: toWallet,
+                    targetWallet: fromWallet,
+                    comment: inText,
+                    piggyAmount: 0
+                });
+
+                this.saveData();
+            },
+
+            deleteTransaction: function(id) {
+                const target = this.data.transactions.find(tx => tx.id === id);
+                if (!target) return;
+                if (!confirm("Вы уверены, что хотите удалить эту операцию?")) return;
+
+                if (target.transferId) {
+                    this.data.transactions = this.data.transactions.filter(tx => tx.transferId !== target.transferId);
+                } else {
+                    this.data.transactions = this.data.transactions.filter(tx => tx.id !== id);
+                }
+
+                this.saveData();
+                this.renderHistoryList();
+                setTimeout(() => this.updateCustomScrollbar(), 50);
+                if (document.getElementById('statistics-modal').classList.contains('open')) {
+                    this.updateStatistics();
+                }
+            },
+            setNoProfit: function() {
+                this.data.transactions.push({
+                    id: Date.now(),
+                    date: this.data.currentDate,
+                    amount: 0,
+                    type: 'income',
+                    comment: '',
+                    piggyAmount: 0,
+                    wallet: 'freedom'
+                });
+                this.changeDate(1);
+            },
+
+            changeDate: function(offset) {
+                const d = this.parseLocalDate(this.data.currentDate);
+                d.setDate(d.getDate() + offset);
+                this.data.currentDate = this.toISODateStr(d);
+                this.saveData(); // Save navigated date to restore user location properly
+            },
+
+            openDatePicker: function() {
+                const picker = document.getElementById('native-date-picker');
+                if (!picker) return;
+                // Устанавливаем текущую выбранную дату приложения в календарь перед открытием
+                picker.value = this.data.currentDate;
+                try {
+                    if (typeof picker.showPicker === 'function') {
+                        picker.showPicker(); // Современный метод вызова календаря в Android/Chrome
+                    } else {
+                        picker.click(); // Запасной вариант
+                    }
+                } catch (e) {
+                    picker.click();
+                }
+            },
+
+            onDatePicked: function(input) {
+                if (!input.value) return;
+                this.data.currentDate = input.value; // формат от input type="date" всегда YYYY-MM-DD
+                this.saveData();
+            },
+
+            // --- ANALYTICS ---
+            calculateAnalytics: function() {
+                const dailyMap = {};
+                this.data.transactions.forEach(tx => {
+                    if (tx.type === 'transfer' || this.isExcluded(tx.wallet)) return;
+                    if(!dailyMap[tx.date]) dailyMap[tx.date] = 0;
+                    if(tx.type === 'income') {
+                        const piggy = tx.piggyAmount || 0;
+                        dailyMap[tx.date] += (tx.amount - piggy);
+                    }
+                    else dailyMap[tx.date] -= tx.amount;
+                });
+
+                const days = Object.keys(dailyMap);
+                let totalNetValue = 0;
+                let activeDays = 0;
+
+                // Speed calculation properly factors in negative day balances as well as neutral or positive
+                days.forEach(d => {
+                    totalNetValue += dailyMap[d];
+                    activeDays++;
+                });
+
+                const avg = activeDays > 0 ? Math.max(0, totalNetValue) / activeDays : 0;
+                const weeklySpeed = Math.round(avg * 7);
+
+                // Прогноз всегда по всем счетам, независимо от выбранной вкладки (скорость тоже считается по всем)
+                const currentBal = this.getAvailableBalance('all');
+                const remaining = this.data.goal - currentBal;
+                let predictText = "---";
+
+                if (remaining <= 0) {
+                    predictText = "Готово!";
+                } else if (avg > 0) {
+                    const daysLeft = Math.ceil(remaining / avg);
+                    const pDate = this.parseLocalDate(this.data.currentDate);
+                    pDate.setDate(pDate.getDate() + daysLeft);
+                    predictText = pDate.toLocaleDateString('ru-RU', {day: 'numeric', month: 'short'});
+                    if(pDate.getFullYear() !== new Date().getFullYear()) {
+                         predictText = pDate.toLocaleDateString('ru-RU', {month: 'short', year: 'numeric'});
+                    }
+                } else {
+                    predictText = "Никогда";
+                }
+
+                document.getElementById('top-predict').innerText = predictText;
+                document.getElementById('top-speed').innerText = weeklySpeed.toLocaleString();
+            },
+
+            // --- RENDER ---
+            renderUI: function() {
+                const d = this.parseLocalDate(this.data.currentDate);
+                const today = this.toISODateStr(new Date());
+                document.getElementById('current-date-display').innerText = 
+                    (this.data.currentDate === today) ? "Сегодня" : d.toLocaleDateString('ru-RU', {day:'numeric', month:'short'});
+
+                const available = this.getAvailableBalance();
+                const piggy = this.getPiggyBalance();
+                document.getElementById('main-balance').innerText = available.toLocaleString();
+                document.getElementById('piggy-balance').innerText = `(В копилке: ${piggy.toLocaleString()} ₸)`;
+                const excluded = this.data.settings.excludedWallets;
+                document.querySelectorAll('.wallet-tab').forEach(t => t.classList.toggle('excluded', excluded.includes(t.dataset.wallet)));
+                document.querySelector('.balance-label').innerText = (this.ui.activeWallet === 'all' && excluded.length)
+                    ? `Баланс без: ${excluded.map(w => this.walletLabel(w)).join(', ')}` : 'Доступный баланс';
+
+                // Protect from division-by-zero or negative goals
+                const goalVal = Math.max(1, this.data.goal);
+                const percent = Math.min(100, Math.max(0, (available / goalVal) * 100));
+                const circle = document.getElementById('progress-circle');
+                const radius = circle.r.baseVal.value;
+                const circumference = 2 * Math.PI * radius;
+                const draw = (percent / 100) * circumference;
+                circle.style.strokeDasharray = `${draw}, ${circumference}`;
+                
+                document.getElementById('goal-percent').innerText = `${Math.round(percent)}% цели`;
+
+                this.calculateAnalytics();
+            },
+
+            // --- HISTORY (CONSOLIDATED) ---
+            renderHistoryList: function() {
+                const list = document.getElementById('history-list');
+                list.innerHTML = '';
+                
+                setTimeout(() => app.updateCustomScrollbar(), 0);
+
+                const filterType = this.ui.historyFilterType || 'all';
+                const filterWallet = document.getElementById('filter-wallet-select').value;
+
+                let filteredTxs = this.data.transactions;
+                if (filterType === 'cashback') {
+                    filteredTxs = filteredTxs.filter(tx => tx.isCashback);
+                } else if (filterType !== 'all') {
+                    filteredTxs = filteredTxs.filter(tx => tx.type === filterType);
+                }
+                
+                if (filterWallet !== 'all') {
+                    filteredTxs = filteredTxs.filter(tx => tx.wallet === filterWallet);
+                }
+                
+                if (this.ui.historyFilterMonth && this.ui.historyFilterMonth !== 'all') {
+                    filteredTxs = filteredTxs.filter(tx => {
+                        const parts = tx.date.split('-');
+                        return parts[1] === this.ui.historyFilterMonth;
+                    });
+                }
+                if (this.ui.historyFilterYear && this.ui.historyFilterYear !== 'all') {
+                    filteredTxs = filteredTxs.filter(tx => {
+                        const parts = tx.date.split('-');
+                        return parts[0] === this.ui.historyFilterYear;
+                    });
+                }
+
+                const query = document.getElementById('history-search').value;
+                if (query.trim()) filteredTxs = filteredTxs.filter(tx => this.matchesSearch(tx, query));
+                const sortMode = document.getElementById('history-sort').value;
+
+                const groups = {};
+                const dayMeta = {};
+
+                filteredTxs.forEach(tx => {
+                    if (!groups[tx.date]) {
+                        groups[tx.date] = 0;
+                        dayMeta[tx.date] = { hasNormal: false, hasTransfer: false };
+                    }
+                    if (tx.type === 'transfer') {
+                        dayMeta[tx.date].hasTransfer = true;
+                        if (filterWallet !== 'all') {
+                            groups[tx.date] += tx.transferDirection === 'in' ? tx.amount : -tx.amount;
+                            dayMeta[tx.date].hasNormal = true;
+                        }
+                    } else {
+                        dayMeta[tx.date].hasNormal = true;
+                        if (tx.type === 'income') groups[tx.date] += tx.amount;
+                        else groups[tx.date] -= tx.amount;
+                    }
+                });
+
+                const sortedDates = Object.keys(groups).sort();
+                if (sortMode === 'big') {
+                    const top = d => Math.max(...filteredTxs.filter(t => t.date === d).map(t => t.amount));
+                    sortedDates.sort((a, b) => top(b) - top(a));
+                } else if (sortMode !== 'old') {
+                    sortedDates.reverse();
+                }
+
+                if (sortedDates.length === 0) {
+                    list.innerHTML = '<div style="text-align:center; color:#555; padding:20px;">Нет записей</div>';
+                    return;
+                }
+
+                sortedDates.forEach(date => {
+                    const net = groups[date];
+                    const groupDiv = document.createElement('div');
+                    groupDiv.className = 'history-day-group';
+
+                    let displayAmount = '';
+                    let colorClass = 'income';
+
+                    if (net === 0 && !dayMeta[date].hasNormal && dayMeta[date].hasTransfer) {
+                        displayAmount = 'Перевод';
+                        colorClass = 'income';
+                    } else if (net === 0) {
+                        displayAmount = 'Без прибыли';
+                        colorClass = 'income';
+                    } else {
+                        const sign = net > 0 ? '+' : '';
+                        colorClass = net < 0 ? 'expense' : 'income';
+                        displayAmount = `${sign}${net.toLocaleString()} ₸`;
+                    }
+
+                    const todayStr = this.toISODateStr(new Date());
+                    const isToday = (date === todayStr);
+                    const localD = this.parseLocalDate(date);
+                    const dateDisplay = isToday ? "Сегодня" : localD.toLocaleDateString('ru-RU', {day: 'numeric', month: 'long', year: 'numeric'});
+
+                    const dayTxs = filteredTxs.filter(tx => tx.date === date);
+                    if (sortMode === 'big') dayTxs.sort((a, b) => b.amount - a.amount);
+                    let detailsHtml = '';
+                    dayTxs.forEach(tx => {
+                        let txSign = tx.type === 'income' ? '+' : '-';
+                        let txColor = tx.type === 'income' ? 'income' : 'expense';
+                        if (tx.type === 'transfer') {
+                            txSign = tx.transferDirection === 'in' ? '+' : '-';
+                            txColor = tx.transferDirection === 'in' ? 'income' : 'expense';
+                        }
+
+                        const commentStr = tx.comment ? this.escapeHtml(tx.comment) : '';
+                        const walletName = this.walletLabel(tx.wallet || 'freedom');
+
+                        detailsHtml += `
+                            <div class="tx-detail-row${this.ui.mergeIds.includes(tx.id) ? ' sel' : ''}" onclick="app.onTxRowClick(${tx.id}, this)">
+                                <div style="display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0;">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <span class="tx-detail-amount ${txColor}" style="font-size: 1rem; font-weight: 600;">${txSign}${tx.amount.toLocaleString()} ₸</span>
+                                        <span style="font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.08); color: var(--text-sec); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">${walletName}</span>
+                                    </div>
+                                    ${commentStr ? `<span class="tx-detail-comment" style="color: var(--text-sec); font-size: 0.8rem; text-align: left; white-space: normal; max-width: 100%; text-overflow: clip; word-break: break-word; line-height: 1.2;">${commentStr}</span>` : ''}
+                                </div>
+                                <button class="btn" style="background: transparent; color: var(--danger); padding: 4px; display: flex; align-items: center; opacity: 0.6;" onclick="event.stopPropagation(); app.deleteTransaction(${tx.id})">
+                                    <svg class="svg-icon" style="width:16px;height:16px;" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                                </button>
+                            </div>
+                        `;
+                    });
+
+                    groupDiv.innerHTML = `
+                        <div class="history-item day-header" onclick="app.toggleHistoryDay(this)">
+                            <span class="h-date">${dateDisplay}</span>
+                            <span class="h-amount ${colorClass}">${displayAmount}</span>
+                        </div>
+                        <div class="day-details">
+                            <div class="day-details-inner">
+                                ${detailsHtml}
+                            </div>
+                        </div>
+                    `;
+                    list.appendChild(groupDiv);
+                });
+                if (query.trim() && sortedDates.length <= 30) list.querySelectorAll('.day-header').forEach(h => this.toggleHistoryDay(h));
+            },
+
+            // Поиск: слово в комментарии/счёте, точная сумма (100), диапазон (>1000, <500), дата (28.10, 28.10.2026, 2026-10-28)
+            matchesSearch: function(tx, raw) {
+                const q = raw.trim().toLowerCase().replace(/\s+/g, ' ');
+                const cmp = q.match(/^([<>])\s*(\d+)$/);
+                if (cmp) return cmp[1] === '>' ? tx.amount > +cmp[2] : tx.amount < +cmp[2];
+                const digits = q.replace(/ /g, '');
+                if (/^\d+$/.test(digits) && tx.amount === +digits) return true;
+                const [y, m, d] = tx.date.split('-');
+                const dm = q.match(/^(\d{1,2})[./](\d{1,2})(?:[./](\d{2,4}))?$/);
+                if (dm) return +dm[1] === +d && +dm[2] === +m && (!dm[3] || +dm[3] % 100 === +y % 100);
+                if (/^\d{4}-\d{2}-\d{2}$/.test(q)) return tx.date === q;
+                return (tx.comment || '').toLowerCase().includes(q) || this.walletLabel(tx.wallet || 'freedom').toLowerCase().includes(q);
+            },
+
+            showToast: function(text) {
+                const el = document.getElementById('toast');
+                el.innerText = text;
+                el.classList.add('show');
+                setTimeout(() => el.classList.remove('show'), 3500);
+            },
+
+            // Тихое напоминание при открытии, если давно не было записей
+            remindAboutEntries: function() {
+                const dates = this.data.transactions.map(t => t.date);
+                if (!dates.length) return;
+                const last = dates.reduce((a, b) => a > b ? a : b);
+                const days = Math.round((this.parseLocalDate(this.toISODateStr(new Date())) - this.parseLocalDate(last)) / 86400000);
+                if (days >= 3) this.showToast(`Последняя запись — ${days} дн. назад`);
+            },
+
+            isExcluded: function(walletKey) {
+                return this.data.settings.excludedWallets.includes(walletKey);
+            },
+
+            toggleWalletExcluded: function(walletKey) {
+                const list = this.data.settings.excludedWallets;
+                const i = list.indexOf(walletKey);
+                if (i >= 0) list.splice(i, 1); else list.push(walletKey);
+                this.saveData();
+            },
+
+            initWalletLongPress: function() {
+                document.querySelectorAll('.wallet-tab').forEach(tab => {
+                    const key = tab.dataset.wallet;
+                    if (key === 'all') return;
+                    let timer = null, fired = false;
+                    const start = () => {
+                        clearTimeout(timer);
+                        fired = false;
+                        timer = setTimeout(() => {
+                            fired = true;
+                            if (navigator.vibrate) navigator.vibrate(40);
+                            this.toggleWalletExcluded(key);
+                        }, 600);
+                    };
+                    const cancel = () => clearTimeout(timer);
+                    tab.addEventListener('touchstart', start, { passive: true });
+                    tab.addEventListener('touchend', cancel);
+                    tab.addEventListener('touchmove', cancel);
+                    tab.addEventListener('mousedown', start);
+                    tab.addEventListener('mouseup', cancel);
+                    tab.addEventListener('mouseleave', cancel);
+                    tab.addEventListener('contextmenu', e => e.preventDefault());
+                    tab.addEventListener('click', e => {
+                        if (fired) { fired = false; e.stopImmediatePropagation(); }
+                    }, true);
+                });
+            },
+
+            toggleMergeMode: function() {
+                this.ui.mergeMode = !this.ui.mergeMode;
+                this.ui.mergeIds = [];
+                this.updateMergeUI();
+                this.renderHistoryList();
+            },
+
+            updateMergeUI: function() {
+                const on = this.ui.mergeMode;
+                document.getElementById('merge-toggle-btn').innerText = on ? 'Отмена' : 'Объединить';
+                document.getElementById('history-list').classList.toggle('merge-mode', on);
+                document.getElementById('merge-confirm-btn').classList.toggle('hidden', !(on && this.ui.mergeIds.length === 2));
+            },
+
+            onTxRowClick: function(id, el) {
+                if (!this.ui.mergeMode) return;
+                const tx = this.data.transactions.find(t => t.id === id);
+                if (!tx || tx.type === 'transfer') return;
+                const i = this.ui.mergeIds.indexOf(id);
+                if (i >= 0) this.ui.mergeIds.splice(i, 1);
+                else if (this.ui.mergeIds.length < 2) this.ui.mergeIds.push(id);
+                else return;
+                el.classList.toggle('sel', i < 0);
+                this.updateMergeUI();
+            },
+
+            // Соединяет трату и доход (одна сумма, разные счета) в пару перевода
+            mergeSelected: function() {
+                const txs = this.ui.mergeIds.map(id => this.data.transactions.find(t => t.id === id));
+                const out = txs.find(t => t && t.type === 'expense');
+                const inc = txs.find(t => t && t.type === 'income');
+                if (!out || !inc) { alert('Нужны одна трата и один доход'); return; }
+                if (out.amount !== inc.amount) { alert('Суммы должны совпадать'); return; }
+                if (out.wallet === inc.wallet) { alert('Счета должны быть разными'); return; }
+
+                const transferId = 'tr_' + Date.now();
+                const note = tx => tx.comment ? ` | ${tx.comment}` : '';
+                const outText = this.getWalletNamePhrase(inc.wallet, 'to') + note(out);
+                const inText = this.getWalletNamePhrase(out.wallet, 'from') + note(inc);
+                Object.assign(out, { type: 'transfer', transferId, transferDirection: 'out', targetWallet: inc.wallet, comment: outText, piggyAmount: 0 });
+                Object.assign(inc, { type: 'transfer', transferId, transferDirection: 'in', targetWallet: out.wallet, comment: inText, piggyAmount: 0 });
+                delete out.isCashback;
+                delete inc.isCashback;
+
+                this.ui.mergeMode = false;
+                this.ui.mergeIds = [];
+                this.updateMergeUI();
+                this.saveData();
+                this.renderHistoryList();
+            },
+
+            buildSummary: function() {
+                const period = document.getElementById('summary-period').value;
+                const now = new Date();
+                const today = this.toISODateStr(now);
+                let from = '0000-00-00';
+                if (period === 'month') from = today.slice(0, 8) + '01';
+                else if (period !== 'all') {
+                    const d = new Date();
+                    d.setDate(d.getDate() - parseInt(period));
+                    from = this.toISODateStr(d);
+                }
+                const txs = this.data.transactions.filter(t => t.type !== 'transfer' && t.amount > 0 && t.date >= from && t.date <= today);
+                const fmt = n => n.toLocaleString('ru-RU') + ' ₸';
+                const sum = list => list.reduce((a, t) => a + t.amount, 0);
+                const groupBy = list => {
+                    const m = {};
+                    list.forEach(t => {
+                        const k = (t.comment || 'Без комментария').replace(/^Кэшбек \| /, '').trim();
+                        m[k] = (m[k] || 0) + t.amount;
+                    });
+                    return Object.entries(m).sort((a, b) => b[1] - a[1]);
+                };
+                const listLines = list => {
+                    const g = groupBy(list);
+                    const lines = g.slice(0, 15).map(([k, v]) => `• ${k}: ${fmt(v)}`);
+                    if (g.length > 15) lines.push(`• Прочее (${g.length - 15}): ${fmt(g.slice(15).reduce((a, e) => a + e[1], 0))}`);
+                    return lines;
+                };
+
+                const incomes = txs.filter(t => t.type === 'income');
+                const cash = incomes.filter(t => t.isCashback);
+                const otherInc = incomes.filter(t => !t.isCashback);
+                const expenses = txs.filter(t => t.type === 'expense');
+
+                const byMonth = {};
+                cash.forEach(t => { const ym = t.date.slice(0, 7); byMonth[ym] = (byMonth[ym] || 0) + t.amount; });
+                const months = Object.keys(byMonth).sort();
+                const cashLines = months.map(ym => {
+                    const [y, m] = ym.split('-');
+                    return `• ${new Date(y, m - 1, 1).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}: ${fmt(byMonth[ym])}`;
+                });
+
+                const L = [];
+                L.push(`СВОДКА ФИНАНСОВ (НА ${now.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase()})`);
+                if (period !== 'all') L.push(`Период: ${from} — ${today}`);
+                L.push('', '=== КЭШБЕК ===', ...cashLines, '');
+                L.push(`ИТОГО КЭШБЕК: ${fmt(sum(cash))}`);
+                if (months.length) L.push(`В активный месяц: ~${fmt(Math.round(sum(cash) / months.length))}`);
+                L.push('', '=== ПРОЧИЕ ДОХОДЫ ===', ...listLines(otherInc), '', `ИТОГО: ${fmt(sum(otherInc))}`);
+                L.push('', '=== РАСХОДЫ ===', ...listLines(expenses), '', `ИТОГО: ${fmt(sum(expenses))}`);
+                L.push('', '=== ОБЩИЙ ИТОГ ===');
+                L.push(`• Все доходы: ${fmt(sum(incomes))}`, `• Все расходы: ${fmt(sum(expenses))}`, `• Результат: ${fmt(sum(incomes) - sum(expenses))}`);
+                L.push('', '=== БАЛАНС ПО СЧЕТАМ (СЕЙЧАС) ===');
+                ['freedom', 'halyk', 'kaspi', 'other'].forEach(w => {
+                    const b = this.getAvailableBalance(w);
+                    if (b !== 0) L.push(`• ${this.walletLabel(w)}: ${fmt(b)}`);
+                });
+                const ex = this.data.settings.excludedWallets;
+                L.push(`ВСЕГО${ex.length ? ' (без ' + ex.map(w => this.walletLabel(w)).join(', ') + ')' : ''}: ${fmt(this.getAvailableBalance('all'))}`);
+                document.getElementById('summary-text').value = L.join('\n');
+            },
+
+            copySummary: function(btn) {
+                const ta = document.getElementById('summary-text');
+                const done = () => { btn.innerText = 'Скопировано ✓'; setTimeout(() => btn.innerText = 'Копировать', 1500); };
+                const fallback = () => { ta.select(); document.execCommand('copy'); done(); };
+                if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(ta.value).then(done, fallback);
+                else fallback();
+            },
+
+            downloadSummary: function() {
+                const blob = new Blob([document.getElementById('summary-text').value], { type: 'text/plain;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `GradeFlow_Summary_${this.toISODateStr(new Date())}.txt`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(url), 100);
+            },
+
+            toggleHistoryDay: function(headerElement) {
+                const details = headerElement.nextElementSibling;
+                const isOpen = details.classList.contains('open');
+                
+                document.querySelectorAll('.day-details.open').forEach(el => {
+                    if (el !== details) {
+                        el.style.maxHeight = el.scrollHeight + 'px';
+                        el.offsetHeight;
+                        el.classList.remove('open');
+                        el.style.maxHeight = '0';
+                    }
+                });
+
+                if (isOpen) {
+                    details.style.maxHeight = details.scrollHeight + 'px';
+                    details.offsetHeight;
+                    details.classList.remove('open');
+                    details.style.maxHeight = '0';
+                } else {
+                    details.classList.add('open');
+                    details.style.maxHeight = (details.scrollHeight + 15) + 'px';
+                }
+            },
+
+            // --- MENU & SIDEBAR ---
+            openSidebar: function() { document.getElementById('sidebar').classList.add('open'); document.getElementById('overlay').classList.add('active'); },
+            closeSidebar: function() { 
+                document.getElementById('sidebar').classList.remove('open'); 
+                document.getElementById('overlay').classList.remove('active'); 
+                this.cancelConfirm(); // If overlay was clicked, also cancel the confirm modal
+            },
+            
+            toggleTheme: function() {
+                const chk = document.getElementById('theme-toggle').checked;
+                this.data.settings.theme = chk ? 'light' : 'dark';
+                this.applyTheme();
+                this.saveData();
+            },
+            applyTheme: function() {
+                if(this.data.settings.theme === 'light') {
+                    document.body.setAttribute('data-theme', 'light');
+                    document.getElementById('theme-toggle').checked = true;
+                } else {
+                    document.body.setAttribute('data-theme', 'dark');
+                    document.getElementById('theme-toggle').checked = false;
+                }
+            },
+            saveSettings: function() {
+                this.data.goal = parseInt(document.getElementById('goal-input').value) || 100000;
+                this.data.initialBalance = parseInt(document.getElementById('start-bal-input').value) || 0;
+                if (!this.data.settings) this.data.settings = {};
+                this.data.settings.piggyBankPercent = Math.min(100, Math.max(0, parseInt(document.getElementById('piggy-percent-input').value) || 0));
+                this.saveData();
+            },
+
+            // Unified Confirm Logic
+            initiateConfirm: function(type) {
+                this.ui.confirmType = type;
+                this.ui.resetStep = 0;
+                const modal = document.getElementById('confirm-modal');
+                const btn = document.getElementById('confirm-yes-btn');
+                const title = document.getElementById('confirm-title');
+                const txt = document.getElementById('confirm-text');
+
+                modal.classList.add('active');
+                
+                // Guarantee color is reset properly on start
+                btn.style.background = "var(--danger)";
+                
+                if(type === 'clearHistory') {
+                    title.innerText = "Очистить историю?";
+                    txt.innerText = "Баланс вернется к начальному. Настройки сохранятся.";
+                    btn.innerText = "Очистить";
+                } else {
+                    title.innerText = "Сброс данных";
+                    txt.innerText = "Шаг 1 из 2. Удалить всё?";
+                    btn.innerText = "Дальше";
+                }
+                
+                btn.onclick = () => app.performConfirmAction();
+            },
+
+            performConfirmAction: function() {
+                if(this.ui.confirmType === 'clearHistory') {
+                    if(this.ui.resetStep === 0) {
+                        this.ui.resetStep = 1;
+                        document.getElementById('confirm-yes-btn').innerText = "ТОЧНО?";
+                        document.getElementById('confirm-yes-btn').style.background = "red";
+                        return;
+                    }
+                    this.data.transactions = [];
+                    this.saveData();
+                    this.renderHistoryList();
+                    this.cancelConfirm();
+                } 
+                else if(this.ui.confirmType === 'reset') {
+                    if(this.ui.resetStep === 0) {
+                        this.ui.resetStep = 1;
+                        document.getElementById('confirm-title').innerText = "ПОСЛЕДНИЙ ШАНС";
+                        document.getElementById('confirm-text').innerText = "Удалить всё навсегда?";
+                        document.getElementById('confirm-yes-btn').innerText = "УДАЛИТЬ";
+                        document.getElementById('confirm-yes-btn').style.background = "red";
+                    } else {
+                        // Удаляем и старые ключи, иначе миграция при перезагрузке вернёт «сброшенные» данные
+                        Object.keys(localStorage).filter(k => /^gradeflow/i.test(k)).forEach(k => localStorage.removeItem(k));
+                        location.reload();
+                    }
+                }
+            },
+
+            cancelConfirm: function() {
+                document.getElementById('confirm-modal').classList.remove('active');
+                const btn = document.getElementById('confirm-yes-btn');
+                if (btn) btn.style.background = "var(--danger)";
+                this.ui.resetStep = 0;
+            },
+
+            saveNotes: function() {
+                this.data.notes = document.getElementById('notes-area').value;
+                try { localStorage.setItem('gradeflow_v3', JSON.stringify(this.data)); } catch (e) { console.error(e); }
+            },
+
+            exportBackup: function() {
+                const dataStr = localStorage.getItem('gradeflow_v3') || JSON.stringify(this.data);
+                const blob = new Blob([dataStr], { type: 'application/json;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                
+                let filename = document.getElementById('export-filename-input').value.trim();
+                if (!filename) {
+                    const now = new Date();
+                    const dd = String(now.getDate()).padStart(2, '0');
+                    const mm = String(now.getMonth() + 1).padStart(2, '0');
+                    const yyyy = now.getFullYear();
+                    filename = `GradeFlow_Backup_${dd}-${mm}-${yyyy}`;
+                }
+                
+                const exportFileDefaultName = `${filename}.json`;
+                
+                const linkElement = document.createElement('a');
+                linkElement.setAttribute('href', url);
+                linkElement.setAttribute('download', exportFileDefaultName);
+                
+                document.body.appendChild(linkElement);
+                linkElement.click();
+                document.body.removeChild(linkElement);
+                
+                setTimeout(() => URL.revokeObjectURL(url), 100);
+            },
+
+            importBackup: function(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const parsed = JSON.parse(e.target.result);
+                        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                            if (!confirm('Импорт полностью заменит текущие данные. Продолжить?')) {
+                                event.target.value = '';
+                                return;
+                            }
+                            if (!Array.isArray(parsed.transactions)) parsed.transactions = [];
+                            if (parsed.initialBalance === undefined) parsed.initialBalance = 0;
+                            if (parsed.goal === undefined) parsed.goal = 100000;
+                            
+                            localStorage.setItem('gradeflow_v3', JSON.stringify(parsed));
+                            alert('Данные успешно импортированы!');
+                            location.reload();
+                        } else {
+                            alert('Неверный формат файла бэкапа.');
+                        }
+                    } catch (err) {
+                        alert('Ошибка при чтении файла бэкапа: ' + err.message);
+                    }
+                };
+                reader.readAsText(file);
+            },
+
+            openModal: function(name) {
+                document.getElementById(`${name}-modal`).classList.add('open');
+                if(name === 'history') {
+                    this.ui.historyFilterType = 'all';
+                    this.ui.historyFilterMonth = 'all';
+                    this.ui.historyFilterYear = 'all';
+                    this.ui.mergeMode = false;
+                    this.ui.mergeIds = [];
+                    this.updateMergeUI();
+                    document.getElementById('history-search').value = '';
+                    document.getElementById('history-sort').value = 'new';
+                    document.getElementById('filter-wallet-select').value = 'all';
+                    
+                    document.querySelectorAll('.filter-type-btn').forEach(btn => {
+                        btn.style.background = 'rgba(255,255,255,0.05)';
+                        btn.style.color = 'var(--text-sec)';
+                    });
+                    const activeBtn = document.getElementById('filter-type-all');
+                    if (activeBtn) {
+                        activeBtn.style.background = 'var(--accent-start)';
+                        activeBtn.style.color = 'white';
+                    }
+                    
+                    this.populateHistoryFilters();
+                    this.renderHistoryList();
+                }
+                if(name === 'summary') this.buildSummary();
+                if(name === 'statistics') {
+                    this.updateStatistics();
+                }
+            },
+
+            closeModal: function(name) {
+                document.getElementById(`${name}-modal`).classList.remove('open');
+            },
+
+            setWalletFilter: function(walletKey, btnElement) {
+                this.ui.activeWallet = walletKey;
+                
+                // Переключаем активный класс у кнопок табов
+                document.querySelectorAll('.wallet-tab').forEach(tab => tab.classList.remove('active'));
+                if (btnElement) btnElement.classList.add('active');
+
+                // Меняем цвет градиента кольца в зависимости от кошелька
+                const stop1 = document.getElementById('grad-stop-1');
+                const stop2 = document.getElementById('grad-stop-2');
+                
+                if (stop1 && stop2) {
+                    if (walletKey === 'kaspi') {
+                        stop1.setAttribute('stop-color', '#b00000'); stop2.setAttribute('stop-color', '#ff1919');
+                    } else if (walletKey === 'halyk') {
+                        stop1.setAttribute('stop-color', '#00e600'); stop2.setAttribute('stop-color', '#0bda51');
+                    } else if (walletKey === 'freedom') {
+                        stop1.setAttribute('stop-color', '#008000'); stop2.setAttribute('stop-color', '#006400');
+                    } else if (walletKey === 'other') {
+                        stop1.setAttribute('stop-color', '#ff6a00'); stop2.setAttribute('stop-color', '#ff4f00');
+                    } else {
+                        // Общий (Синий по умолчанию)
+                        stop1.setAttribute('stop-color', '#00c6ff'); stop2.setAttribute('stop-color', '#0072ff');
+                    }
+                }
+
+                this.renderUI();
+            },
+
+            populateHistoryFilters: function() {
+                const yearSelect = document.getElementById('filter-year-select');
+                if (!yearSelect) return;
+                
+                // Hardcode/seed with at least 2025-2027 range as requested
+                const years = new Set(['2025', '2026', '2027']);
+                this.data.transactions.forEach(tx => {
+                    const year = tx.date.split('-')[0];
+                    if (year) years.add(year);
+                });
+                
+                yearSelect.innerHTML = '<option value="all">Все года</option>';
+                Array.from(years).sort().reverse().forEach(year => {
+                    const opt = document.createElement('option');
+                    opt.value = year;
+                    opt.innerText = year;
+                    yearSelect.appendChild(opt);
+                });
+
+                document.getElementById('filter-month-select').value = this.ui.historyFilterMonth || 'all';
+                yearSelect.value = this.ui.historyFilterYear || 'all';
+            },
+
+            setHistoryTypeFilter: function(type) {
+                this.ui.historyFilterType = type;
+                
+                document.querySelectorAll('.filter-type-btn').forEach(btn => {
+                    btn.style.background = 'rgba(255,255,255,0.05)';
+                    btn.style.color = 'var(--text-sec)';
+                });
+                
+                const activeBtn = document.getElementById(`filter-type-${type}`);
+                if (activeBtn) {
+                    activeBtn.style.background = 'var(--accent-start)';
+                    activeBtn.style.color = 'white';
+                }
+                
+                this.renderHistoryList();
+            },
+
+            setHistoryPeriodFilter: function() {
+                const month = document.getElementById('filter-month-select').value;
+                const year = document.getElementById('filter-year-select').value;
+                
+                this.ui.historyFilterMonth = month;
+                this.ui.historyFilterYear = year;
+                
+                this.renderHistoryList();
+            },
+
+            // Модель: кэшбек тратится первым и при переводе переезжает вместе с деньгами. Возвращает { spent, free }
+            calcCashbackUsage: function() {
+                const txs = [...this.data.transactions].sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id);
+                const pool = {};
+                let spent = 0;
+                txs.forEach(t => {
+                    const w = t.wallet || 'freedom';
+                    pool[w] = pool[w] || 0;
+                    if (t.type === 'income') {
+                        if (t.isCashback) pool[w] += t.amount - (t.piggyAmount || 0);
+                    } else if (t.type === 'expense') {
+                        const used = Math.min(pool[w], t.amount);
+                        pool[w] -= used;
+                        spent += used;
+                    } else if (t.type === 'transfer' && t.transferDirection === 'out') {
+                        const moved = Math.min(pool[w], t.amount);
+                        pool[w] -= moved;
+                        const target = t.targetWallet || w;
+                        pool[target] = (pool[target] || 0) + moved;
+                    }
+                });
+                return { spent, free: Object.values(pool).reduce((a, v) => a + v, 0) };
+            },
+
+            updateStatistics: function() {
+                const real = this.data.transactions.filter(t => t.type !== 'transfer');
+                const sum = list => list.reduce((acc, t) => acc + t.amount, 0);
+                const income = sum(real.filter(t => t.type === 'income'));
+                const expense = sum(real.filter(t => t.type === 'expense'));
+                const cash = real.filter(t => t.type === 'income' && t.isCashback);
+                const cashTotal = sum(cash);
+                const cashMonths = new Set(cash.map(t => t.date.slice(0, 7))).size;
+                const perMonth = cashMonths ? Math.round(cashTotal / cashMonths) : 0;
+
+                const set = (id, v) => { document.getElementById(id).innerText = `${v.toLocaleString()} ₸`; };
+                set('stat-total-income', income);
+                set('stat-total-expense', expense);
+                set('stat-net', income - expense);
+                set('stat-cb-total', cashTotal);
+                set('stat-cb-month', perMonth);
+                set('stat-cb-week', Math.round(perMonth * 12 / 52));
+                const usage = this.calcCashbackUsage();
+                set('stat-cb-spent', usage.spent);
+                set('stat-cb-free', usage.free);
+
+                const since = new Date();
+                since.setDate(since.getDate() - 30);
+                const recent = real.filter(t => t.date >= this.toISODateStr(since));
+                const rIn = sum(recent.filter(t => t.type === 'income'));
+                const rOut = sum(recent.filter(t => t.type === 'expense'));
+                const netEl = document.getElementById('stat-30-net');
+                netEl.innerText = `${rIn - rOut > 0 ? '+' : ''}${(rIn - rOut).toLocaleString()} ₸`;
+                netEl.style.color = rIn - rOut < 0 ? 'var(--danger)' : 'var(--success)';
+                document.getElementById('stat-30-detail').innerText = `доход ${rIn.toLocaleString()} · расход ${rOut.toLocaleString()}` + (rIn < rOut ? ' — расходы выше доходов' : '');
+            }
+        };
+    
+
+        if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+
+        window.addEventListener('DOMContentLoaded', () => app.init());
+    </script>
+</body>
+</html>
