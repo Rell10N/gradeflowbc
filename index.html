@@ -770,9 +770,11 @@
             </div>
 
             <!-- Aesthetic Subtle Clear History Button -->
-            <div style="display:flex; justify-content:space-between; gap:8px; margin-bottom:10px;">
-                <div style="display:flex; gap:8px;">
+            <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+                <div style="display:flex; flex-wrap:wrap; gap:8px;">
                     <button id="merge-toggle-btn" class="btn" style="padding: 6px 12px; border-radius: 8px; background: rgba(0,198,255,0.1); border: 1px solid rgba(0,198,255,0.25); color: var(--accent-start); font-size: 0.8rem; font-weight: 500;" onclick="app.toggleMergeMode()">Объединить</button>
+                    <button id="move-toggle-btn" class="btn" style="padding: 6px 12px; border-radius: 8px; background: rgba(0,198,255,0.1); border: 1px solid rgba(0,198,255,0.25); color: var(--accent-start); font-size: 0.8rem; font-weight: 500;" onclick="app.toggleMergeMode('move')">Перенести</button>
+                    <button id="move-confirm-btn" class="btn hidden" style="padding: 6px 12px; border-radius: 8px; background: linear-gradient(135deg, var(--accent-start), var(--accent-end)); color: white; font-size: 0.8rem; font-weight: 600;" onclick="app.pickMoveDate()">Дата</button>
                     <button id="merge-confirm-btn" class="btn hidden" style="padding: 6px 12px; border-radius: 8px; background: linear-gradient(135deg, var(--accent-start), var(--accent-end)); color: white; font-size: 0.8rem; font-weight: 600;" onclick="app.mergeSelected()">В перевод</button>
                 </div>
                 <button class="btn" style="padding: 6px 12px; border-radius: 8px; background: rgba(255, 75, 75, 0.08); border: 1px solid rgba(255, 75, 75, 0.15); color: #ff6b6b; font-size: 0.8rem; font-weight: 500; transition: var(--transition);" onclick="app.initiateConfirm('clearHistory')" onmouseover="this.style.background='rgba(255, 75, 75, 0.15)'" onmouseout="this.style.background='rgba(255, 75, 75, 0.08)'">
@@ -854,6 +856,7 @@
         </div>
     </div>
 
+    <input type="date" id="move-date-input" style="position: fixed; bottom: 0; left: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none;" onchange="app.applyMove(this.value); this.value = '';">
     <div id="toast"></div>
     <script>
         const app = {
@@ -871,6 +874,7 @@
                 resetStep: 0,
                 activeWallet: 'all',
                 mergeMode: false,
+                selectKind: 'merge',
                 mergeIds: []
             },
 
@@ -1697,27 +1701,58 @@
                 });
             },
 
-            toggleMergeMode: function() {
-                this.ui.mergeMode = !this.ui.mergeMode;
+            // kind: 'merge' (две операции в перевод) или 'move' (перенос на другую дату)
+            toggleMergeMode: function(kind = 'merge') {
+                const same = this.ui.mergeMode && this.ui.selectKind === kind;
+                this.ui.mergeMode = !same;
+                this.ui.selectKind = kind;
                 this.ui.mergeIds = [];
                 this.updateMergeUI();
                 this.renderHistoryList();
             },
 
             updateMergeUI: function() {
-                const on = this.ui.mergeMode;
-                document.getElementById('merge-toggle-btn').innerText = on ? 'Отмена' : 'Объединить';
+                const on = this.ui.mergeMode, kind = this.ui.selectKind, n = this.ui.mergeIds.length;
+                document.getElementById('merge-toggle-btn').innerText = on && kind === 'merge' ? 'Отмена' : 'Объединить';
+                document.getElementById('move-toggle-btn').innerText = on && kind === 'move' ? 'Отмена' : 'Перенести';
                 document.getElementById('history-list').classList.toggle('merge-mode', on);
-                document.getElementById('merge-confirm-btn').classList.toggle('hidden', !(on && this.ui.mergeIds.length === 2));
+                document.getElementById('merge-confirm-btn').classList.toggle('hidden', !(on && kind === 'merge' && n === 2));
+                const mv = document.getElementById('move-confirm-btn');
+                mv.classList.toggle('hidden', !(on && kind === 'move' && n > 0));
+                mv.innerText = `Дата (${n})`;
+            },
+
+            pickMoveDate: function() {
+                const input = document.getElementById('move-date-input');
+                if (input.showPicker) input.showPicker(); else input.click();
+            },
+
+            // Переносит выбранные операции на дату; обе части перевода переезжают вместе
+            applyMove: function(dateStr) {
+                if (!dateStr || !this.ui.mergeIds.length) return;
+                const ids = new Set(this.ui.mergeIds);
+                this.data.transactions.forEach(t => {
+                    if (ids.has(t.id) && t.transferId) {
+                        this.data.transactions.forEach(p => { if (p.transferId === t.transferId) ids.add(p.id); });
+                    }
+                });
+                let moved = 0;
+                this.data.transactions.forEach(t => { if (ids.has(t.id)) { t.date = dateStr; moved++; } });
+                this.ui.mergeMode = false;
+                this.ui.mergeIds = [];
+                this.updateMergeUI();
+                this.saveData();
+                this.renderHistoryList();
+                this.showToast(`Перенесено на ${dateStr.split('-').reverse().join('.')}: ${moved}`);
             },
 
             onTxRowClick: function(id, el) {
                 if (!this.ui.mergeMode) return;
                 const tx = this.data.transactions.find(t => t.id === id);
-                if (!tx || tx.type === 'transfer') return;
+                if (!tx || (tx.type === 'transfer' && this.ui.selectKind !== 'move')) return;
                 const i = this.ui.mergeIds.indexOf(id);
                 if (i >= 0) this.ui.mergeIds.splice(i, 1);
-                else if (this.ui.mergeIds.length < 2) this.ui.mergeIds.push(id);
+                else if (this.ui.selectKind === 'move' || this.ui.mergeIds.length < 2) this.ui.mergeIds.push(id);
                 else return;
                 el.classList.toggle('sel', i < 0);
                 this.updateMergeUI();
