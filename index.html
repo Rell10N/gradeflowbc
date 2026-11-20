@@ -456,6 +456,9 @@
         .modal-content { padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px)); }
         #toast { position: fixed; top: calc(16px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); z-index: 300; padding: 10px 16px; border-radius: 12px; background: var(--card-bg); color: var(--text-main); border: 1px solid var(--input-border); font-size: 0.85rem; box-shadow: var(--shadow); opacity: 0; pointer-events: none; transition: opacity 0.4s; max-width: 90%; text-align: center; }
         #toast.show { opacity: 1; }
+        .stats-period-btn { flex: 1; padding: 8px 4px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; background: rgba(255,255,255,0.05); color: var(--text-sec); }
+        .stats-period-btn.active { background: linear-gradient(135deg, var(--accent-start), var(--accent-end)); color: white; }
+        .stats-date { flex: 1; min-width: 0; padding: 8px; height: 36px; font-size: 0.85rem; text-align: center; background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 8px; color: var(--text-main); }
         .stat-title { font-size: 0.8rem; color: var(--text-sec); text-transform: uppercase; letter-spacing: 0.5px; }
         .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .stat-card { padding: 16px 10px; display: flex; flex-direction: column; gap: 4px; align-items: center; text-align: center; }
@@ -593,6 +596,7 @@
             <div class="day-actions">
                 <button class="btn action-btn" style="background: rgba(255, 75, 75, 0.1); border: 1px solid rgba(255, 75, 75, 0.2); color: var(--danger);" onclick="app.clearInput()">Очистить</button>
                 <button class="btn action-btn" style="background: rgba(0, 198, 255, 0.12); border: 1px solid rgba(0, 198, 255, 0.25); color: var(--accent-start);" onclick="app.quickCashback()">Кэшбек</button>
+                <button class="btn action-btn" style="background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.4); color: #c4b5fd;" onclick="app.quickWbCashback()">ВБ кэшбек</button>
             </div>
         </div>
     </div>
@@ -638,6 +642,11 @@
             <div class="setting-item">
                 <span class="setting-label">Отчисления в копилку (%)</span>
                 <input type="number" id="piggy-percent-input" class="input-field" style="text-align:left; background: rgba(255,255,255,0.05);" min="0" max="100" onchange="app.saveSettings()">
+            </div>
+
+            <div class="setting-item">
+                <span class="setting-label">Остаток ВБ-кэшбека (₸, меньше 1)</span>
+                <input type="number" id="wb-rest-input" class="input-field" style="text-align:left; background: rgba(255,255,255,0.05);" min="0" max="0.99" step="0.01" onchange="app.saveSettings()">
             </div>
 
             <!-- Custom Backup section inside settings -->
@@ -779,6 +788,7 @@
                 <div style="display:flex; gap:8px; width:100%;">
                     <button id="merge-toggle-btn" class="btn" style="flex: 1; padding: 8px 6px; text-align: center; white-space: nowrap; border-radius: 8px; background: rgba(0,198,255,0.1); border: 1px solid rgba(0,198,255,0.25); color: var(--accent-start); font-size: 0.8rem; font-weight: 500;" onclick="app.toggleMergeMode()">Объединить</button>
                     <button id="move-toggle-btn" class="btn" style="flex: 1; padding: 8px 6px; text-align: center; white-space: nowrap; border-radius: 8px; background: rgba(0,198,255,0.1); border: 1px solid rgba(0,198,255,0.25); color: var(--accent-start); font-size: 0.8rem; font-weight: 500;" onclick="app.toggleMergeMode('move')">Перенести</button>
+                    <button id="edit-toggle-btn" class="btn" style="flex: 1; padding: 8px 6px; text-align: center; white-space: nowrap; border-radius: 8px; background: rgba(0,198,255,0.1); border: 1px solid rgba(0,198,255,0.25); color: var(--accent-start); font-size: 0.8rem; font-weight: 500;" onclick="app.toggleMergeMode('edit')">Изменить</button>
                     <button id="move-confirm-btn" class="btn hidden" style="flex: 1; padding: 8px 6px; text-align: center; white-space: nowrap; border-radius: 8px; background: linear-gradient(135deg, var(--accent-start), var(--accent-end)); color: white; font-size: 0.8rem; font-weight: 600;" onclick="app.pickMoveDate()">Дата</button>
                     <button id="merge-confirm-btn" class="btn hidden" style="flex: 1; padding: 8px 6px; text-align: center; white-space: nowrap; border-radius: 8px; background: linear-gradient(135deg, var(--accent-start), var(--accent-end)); color: white; font-size: 0.8rem; font-weight: 600;" onclick="app.mergeSelected()">В перевод</button>
                 </div>
@@ -804,6 +814,18 @@
         </div>
         <div class="modal-content">
             <div class="stats-container" style="display: flex; flex-direction: column; gap: 14px; padding-top: 10px;">
+                <div style="display: flex; gap: 6px;">
+                    <button class="btn stats-period-btn active" data-period="all" onclick="app.setStatsPeriod('all')">Всё</button>
+                    <button class="btn stats-period-btn" data-period="week" onclick="app.setStatsPeriod('week')">Неделя</button>
+                    <button class="btn stats-period-btn" data-period="month" onclick="app.setStatsPeriod('month')">Месяц</button>
+                    <button class="btn stats-period-btn" data-period="year" onclick="app.setStatsPeriod('year')">Год</button>
+                    <button class="btn stats-period-btn" data-period="custom" onclick="app.setStatsPeriod('custom')">Свой</button>
+                </div>
+                <div id="stats-custom-range" class="hidden" style="display: flex; gap: 8px;">
+                    <input type="date" id="stats-from" class="stats-date" onchange="app.updateStatistics()">
+                    <input type="date" id="stats-to" class="stats-date" onchange="app.updateStatistics()">
+                </div>
+                <div id="stats-period-label" style="font-size: 0.75rem; color: var(--text-sec); text-align: center; margin-top: -6px;"></div>
                 <div class="stat-title">Общие финансы</div>
                 <div class="stat-grid">
                     <div class="stat-card glass"><span>Валовый доход</span><span id="stat-total-income" style="color: var(--success);">0 ₸</span></div>
@@ -817,6 +839,7 @@
                     <div class="stat-card glass"><span>В активный месяц</span><span id="stat-cb-month" style="">0 ₸</span></div>
                 </div>
                 <div class="stat-card glass"><span>В неделю (в среднем)</span><span id="stat-cb-week" style="">0 ₸</span></div>
+                <div id="stat-wb-rest" style="font-size: 0.75rem; text-align: center; color: #a78bfa; margin-top: -6px;"></div>
                 <div class="stat-grid">
                     <div class="stat-card glass"><span>Потрачено кэшбека</span><span id="stat-cb-spent" style="color: var(--danger);">0 ₸</span></div>
                     <div class="stat-card glass"><span>Свободный кэшбек</span><span id="stat-cb-free" style="color: var(--success);">0 ₸</span></div>
@@ -845,6 +868,45 @@
             </div>
             <textarea id="summary-text" readonly style="flex: 1; min-height: 0; width: 100%; background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 10px; color: var(--text-main); padding: 12px; font-size: 0.85rem; font-family: monospace; resize: none; outline: none;"></textarea>
             
+        </div>
+    </div>
+
+    <!-- EDIT TRANSACTION MODAL -->
+    <div id="edit-modal" class="modal">
+        <div class="modal-header">
+            <h3>Изменить операцию</h3>
+            <button class="icon-btn" onclick="app.closeModal('edit')">&times;</button>
+        </div>
+        <div class="modal-content" style="display: flex; flex-direction: column; gap: 14px;">
+            <div style="display: flex; gap: 8px;">
+                <button id="edit-type-income" class="btn stats-period-btn" onclick="app.setEditType('income')">Доход</button>
+                <button id="edit-type-expense" class="btn stats-period-btn" onclick="app.setEditType('expense')">Расход</button>
+            </div>
+            <div class="setting-item">
+                <span class="setting-label">Сумма (₸)</span>
+                <input type="number" id="edit-amount" class="input-field" inputmode="numeric" style="text-align: left; background: var(--input-bg);">
+            </div>
+            <div class="setting-item">
+                <span class="setting-label">Счёт</span>
+                <select id="edit-wallet" class="input-field" style="text-align: left; background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-main);">
+                    <option value="freedom">Freedom</option>
+                    <option value="halyk">Halyk</option>
+                    <option value="kaspi">Kaspi</option>
+                    <option value="other">Наличные</option>
+                </select>
+            </div>
+            <div class="setting-item">
+                <span class="setting-label">Дата</span>
+                <input type="date" id="edit-date" class="input-field" style="text-align: left; background: var(--input-bg);">
+            </div>
+            <div class="setting-item">
+                <span class="setting-label">Комментарий</span>
+                <input type="text" id="edit-comment" class="input-field" style="text-align: left; background: var(--input-bg);">
+            </div>
+            <label id="edit-cashback-row" style="display: flex; align-items: center; gap: 10px; font-size: 0.9rem; color: var(--text-main);">
+                <input type="checkbox" id="edit-cashback" style="width: 18px; height: 18px;"> Кэшбек банка (считается в статистике кэшбека)
+            </label>
+            <button class="btn btn-ok" style="padding: 14px;" onclick="app.saveEdit()">Сохранить</button>
         </div>
     </div>
 
@@ -877,6 +939,9 @@
                 activeWallet: 'all',
                 mergeMode: false,
                 selectKind: 'merge',
+                statsPeriod: 'all',
+                editId: null,
+                editType: 'expense',
                 mergeIds: []
             },
 
@@ -1108,6 +1173,7 @@
                 document.getElementById('goal-input').value = this.data.goal;
                 document.getElementById('start-bal-input').value = this.data.initialBalance;
                 document.getElementById('piggy-percent-input').value = this.data.settings.piggyBankPercent;
+                document.getElementById('wb-rest-input').value = (this.data.wbRemainder || 0) / 100;
                 document.getElementById('notes-area').value = this.data.notes;
 
                 this.initBtnLongPress();
@@ -1263,6 +1329,91 @@
                 input.value = '';
                 if (commentInput) commentInput.value = '';
                 this.saveData();
+            },
+
+            openEdit: function(id) {
+                const tx = this.data.transactions.find(t => t.id === id);
+                if (!tx) return;
+                if (tx.type === 'transfer') {
+                    this.showToast('Перевод можно перенести или удалить');
+                    return;
+                }
+                this.ui.editId = id;
+                document.getElementById('edit-amount').value = tx.amount;
+                document.getElementById('edit-wallet').value = tx.wallet || 'freedom';
+                document.getElementById('edit-date').value = tx.date;
+                document.getElementById('edit-comment').value = tx.comment || '';
+                document.getElementById('edit-cashback').checked = !!tx.isCashback;
+                this.setEditType(tx.type);
+                this.openModal('edit');
+            },
+
+            setEditType: function(type) {
+                this.ui.editType = type;
+                document.getElementById('edit-type-income').classList.toggle('active', type === 'income');
+                document.getElementById('edit-type-expense').classList.toggle('active', type === 'expense');
+                document.getElementById('edit-cashback-row').classList.toggle('hidden', type !== 'income');
+            },
+
+            saveEdit: function() {
+                const tx = this.data.transactions.find(t => t.id === this.ui.editId);
+                if (!tx) return;
+                const amount = parseInt(document.getElementById('edit-amount').value);
+                const date = document.getElementById('edit-date').value;
+                if (!amount || amount <= 0 || !date) {
+                    alert('Укажи сумму и дату');
+                    return;
+                }
+                const type = this.ui.editType;
+                // Копилка пересчитывается пропорционально, только если это был доход с отчислением
+                const piggy = (type === 'income' && tx.type === 'income' && tx.piggyAmount) ? Math.round(amount * tx.piggyAmount / tx.amount) : 0;
+                tx.type = type;
+                tx.amount = amount;
+                tx.date = date;
+                tx.wallet = document.getElementById('edit-wallet').value;
+                tx.comment = document.getElementById('edit-comment').value.trim();
+                tx.piggyAmount = piggy;
+                if (type === 'income' && document.getElementById('edit-cashback').checked) tx.isCashback = true;
+                else delete tx.isCashback;
+
+                this.closeModal('edit');
+                this.saveData();
+                this.renderHistoryList();
+                this.showToast('Сохранено');
+            },
+
+            // Остаток ВБ-кэшбека хранится в сотых долях тенге (целое число 0–99), чтобы не плодить дроби
+            formatWbRest: function() {
+                return ((this.data.wbRemainder || 0) / 100).toLocaleString('ru-RU', { maximumFractionDigits: 2 });
+            },
+
+            // Покупка на WB: пишет трату и 1% кэшбека целыми тенге, а дробную часть копит до следующей покупки
+            quickWbCashback: function() {
+                const input = document.getElementById('manual-amount');
+                const val = parseInt(input.value);
+                if (!val || val <= 0) {
+                    alert('Сначала введи сумму покупки!');
+                    return;
+                }
+                const commentInput = document.getElementById('manual-comment');
+                const comment = commentInput ? commentInput.value.trim() : '';
+                const walletSelect = document.getElementById('manual-wallet');
+                const wallet = walletSelect ? walletSelect.value : 'freedom';
+
+                // 1% от val тенге = val сотых тенге
+                const total = (this.data.wbRemainder || 0) + val;
+                const whole = Math.floor(total / 100);
+                this.data.wbRemainder = total % 100;
+
+                const now = Date.now();
+                this.data.transactions.push({ id: now, date: this.data.currentDate, amount: val, type: 'expense', comment: comment || 'Wildberries', piggyAmount: 0, wallet: wallet });
+                if (whole > 0) {
+                    this.data.transactions.push({ id: now + 1, date: this.data.currentDate, amount: whole, type: 'income', comment: 'Кэшбек ВБ', piggyAmount: 0, wallet: wallet });
+                }
+                input.value = '';
+                if (commentInput) commentInput.value = '';
+                this.saveData();
+                this.showToast(`ВБ: +${whole} ₸, остаток ${this.formatWbRest()} ₸`);
             },
 
             getWalletNamePhrase: function(walletKey, direction) {
@@ -1711,12 +1862,16 @@
                 this.ui.mergeIds = [];
                 this.updateMergeUI();
                 this.renderHistoryList();
+                if (this.ui.mergeMode && kind === 'edit') this.showToast('Нажми на операцию, чтобы изменить');
             },
 
             updateMergeUI: function() {
                 const on = this.ui.mergeMode, kind = this.ui.selectKind, n = this.ui.mergeIds.length;
                 document.getElementById('merge-toggle-btn').innerText = on && kind === 'merge' ? 'Отмена' : 'Объединить';
                 document.getElementById('move-toggle-btn').innerText = on && kind === 'move' ? 'Отмена' : 'Перенести';
+                document.getElementById('edit-toggle-btn').innerText = on && kind === 'edit' ? 'Отмена' : 'Изменить';
+                // В активном режиме остаётся только его кнопка, чтобы ряд не был тесным
+                ['merge', 'move', 'edit'].forEach(k => document.getElementById(`${k}-toggle-btn`).classList.toggle('hidden', on && kind !== k));
                 document.getElementById('history-list').classList.toggle('merge-mode', on);
                 document.getElementById('merge-confirm-btn').classList.toggle('hidden', !(on && kind === 'merge' && n === 2));
                 const mv = document.getElementById('move-confirm-btn');
@@ -1750,6 +1905,7 @@
 
             onTxRowClick: function(id, el) {
                 if (!this.ui.mergeMode) return;
+                if (this.ui.selectKind === 'edit') { this.openEdit(id); return; }
                 const tx = this.data.transactions.find(t => t.id === id);
                 if (!tx || (tx.type === 'transfer' && this.ui.selectKind !== 'move')) return;
                 const i = this.ui.mergeIds.indexOf(id);
@@ -1815,8 +1971,8 @@
                 };
 
                 const incomes = txs.filter(t => t.type === 'income');
-                const cash = incomes.filter(t => t.isCashback);
-                const otherInc = incomes.filter(t => !t.isCashback);
+                const cash = incomes.filter(t => this.isRegularCashback(t));
+                const otherInc = incomes.filter(t => !this.isRegularCashback(t));
                 const expenses = txs.filter(t => t.type === 'expense');
 
                 const byMonth = {};
@@ -1919,6 +2075,7 @@
                 this.data.initialBalance = parseInt(document.getElementById('start-bal-input').value) || 0;
                 if (!this.data.settings) this.data.settings = {};
                 this.data.settings.piggyBankPercent = Math.min(100, Math.max(0, parseInt(document.getElementById('piggy-percent-input').value) || 0));
+                this.data.wbRemainder = Math.min(99, Math.max(0, Math.round((parseFloat(document.getElementById('wb-rest-input').value) || 0) * 100)));
                 this.saveData();
             },
 
@@ -2206,39 +2363,111 @@
                 this.renderHistoryList();
             },
 
-            // Модель: кэшбек тратится первым и при переводе переезжает вместе с деньгами. Возвращает { spent, free }
-            calcCashbackUsage: function() {
+            // Кэшбек банка всегда кратен 100; всё остальное (например, WB) в кэшбек не считается
+            isRegularCashback: function(t) {
+                return t.type === 'income' && !!t.isCashback && t.amount % 100 === 0;
+            },
+
+            // Период статистики: { from, to } в формате YYYY-MM-DD (открытые границы — '0000-00-00' / '9999-12-31')
+            getStatsRange: function() {
+                const today = this.toISODateStr(new Date());
+                const back = n => { const d = new Date(); d.setDate(d.getDate() - n + 1); return this.toISODateStr(d); };
+                switch (this.ui.statsPeriod) {
+                    case 'week': return { from: back(7), to: today };
+                    case 'month': return { from: back(30), to: today };
+                    case 'year': return { from: back(365), to: today };
+                    case 'custom': {
+                        let from = document.getElementById('stats-from').value || '0000-00-00';
+                        let to = document.getElementById('stats-to').value || '9999-12-31';
+                        if (from > to) [from, to] = [to, from];
+                        return { from, to };
+                    }
+                    default: return { from: '0000-00-00', to: '9999-12-31' };
+                }
+            },
+
+            setStatsPeriod: function(period) {
+                this.ui.statsPeriod = period;
+                document.getElementById('stats-custom-range').classList.toggle('hidden', period !== 'custom');
+                if (period === 'custom') {
+                    const fromEl = document.getElementById('stats-from'), toEl = document.getElementById('stats-to');
+                    const today = this.toISODateStr(new Date());
+                    if (!fromEl.value) fromEl.value = today.slice(0, 8) + '01';
+                    if (!toEl.value) toEl.value = today;
+                }
+                this.updateStatistics();
+            },
+
+            // Модель: на каждом счёте лежат «кэшбек» и «обычные» деньги. Траты и переводы сначала берут обычные деньги,
+            // кэшбек уходит последним; при переводе состав денег переезжает вместе с суммой.
+            // Если трату внесли раньше, чем пришли деньги (debt), поступление сперва закрывает этот долг.
+            // spent — кэшбек, потраченный за период [from, to]; free — кэшбек, оставшийся на счетах к концу периода
+            calcCashbackUsage: function(from = '0000-00-00', to = '9999-12-31') {
                 const txs = [...this.data.transactions].sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id);
-                const pool = {};
+                const wallets = {};
+                const get = w => wallets[w] || (wallets[w] = { cb: 0, real: 0, debt: 0 });
                 let spent = 0;
+                const take = (w, amount) => {
+                    const wl = get(w);
+                    const real = Math.min(wl.real, amount);
+                    const cb = Math.min(wl.cb, amount - real);
+                    wl.real -= real;
+                    wl.cb -= cb;
+                    wl.debt += amount - real - cb;
+                    return { real, cb };
+                };
+                const receive = (w, real, cb, date) => {
+                    const wl = get(w);
+                    const payReal = Math.min(real, wl.debt);
+                    wl.debt -= payReal;
+                    const payCb = Math.min(cb, wl.debt);
+                    wl.debt -= payCb;
+                    if (payCb && date >= from) spent += payCb;
+                    wl.real += real - payReal;
+                    wl.cb += cb - payCb;
+                };
                 txs.forEach(t => {
+                    if (t.date > to) return;
                     const w = t.wallet || 'freedom';
-                    pool[w] = pool[w] || 0;
                     if (t.type === 'income') {
-                        if (t.isCashback) pool[w] += t.amount - (t.piggyAmount || 0);
+                        const net = t.amount - (t.piggyAmount || 0);
+                        if (this.isRegularCashback(t)) receive(w, 0, net, t.date); else receive(w, net, 0, t.date);
                     } else if (t.type === 'expense') {
-                        const used = Math.min(pool[w], t.amount);
-                        pool[w] -= used;
-                        spent += used;
+                        const taken = take(w, t.amount);
+                        if (t.date >= from) spent += taken.cb;
                     } else if (t.type === 'transfer' && t.transferDirection === 'out') {
-                        const moved = Math.min(pool[w], t.amount);
-                        pool[w] -= moved;
-                        const target = t.targetWallet || w;
-                        pool[target] = (pool[target] || 0) + moved;
+                        const moved = take(w, t.amount);
+                        receive(t.targetWallet || w, moved.real, moved.cb, t.date);
                     }
                 });
-                return { spent, free: Object.values(pool).reduce((a, v) => a + v, 0) };
+                return { spent, free: Object.values(wallets).reduce((a, wl) => a + wl.cb, 0), byWallet: wallets };
             },
 
             updateStatistics: function() {
-                const real = this.data.transactions.filter(t => t.type !== 'transfer');
+                const { from, to } = this.getStatsRange();
+                const today = this.toISODateStr(new Date());
+                const fmtDate = d => d.split('-').reverse().join('.');
+                document.querySelectorAll('.stats-period-btn').forEach(b => b.classList.toggle('active', b.dataset.period === this.ui.statsPeriod));
+                document.getElementById('stats-period-label').innerText = this.ui.statsPeriod === 'all'
+                    ? 'За всё время'
+                    : `${from === '0000-00-00' ? 'с начала' : fmtDate(from)} — ${to === '9999-12-31' ? 'сегодня' : fmtDate(to)}`;
+
+                const realAll = this.data.transactions.filter(t => t.type !== 'transfer');
+                const real = realAll.filter(t => t.date >= from && t.date <= to);
                 const sum = list => list.reduce((acc, t) => acc + t.amount, 0);
                 const income = sum(real.filter(t => t.type === 'income'));
                 const expense = sum(real.filter(t => t.type === 'expense'));
-                const cash = real.filter(t => t.type === 'income' && t.isCashback);
+                const cash = real.filter(t => this.isRegularCashback(t));
                 const cashTotal = sum(cash);
                 const cashMonths = new Set(cash.map(t => t.date.slice(0, 7))).size;
                 const perMonth = cashMonths ? Math.round(cashTotal / cashMonths) : 0;
+
+                let perWeek = Math.round(perMonth * 12 / 52);
+                if (this.ui.statsPeriod !== 'all') {
+                    const first = this.data.transactions.reduce((m, t) => t.date < m ? t.date : m, today);
+                    const days = (this.parseLocalDate(to === '9999-12-31' ? today : to) - this.parseLocalDate(from === '0000-00-00' ? first : from)) / 86400000 + 1;
+                    perWeek = Math.round(cashTotal / Math.max(1, days / 7));
+                }
 
                 const set = (id, v) => { document.getElementById(id).innerText = `${v.toLocaleString()} ₸`; };
                 set('stat-total-income', income);
@@ -2246,14 +2475,16 @@
                 set('stat-net', income - expense);
                 set('stat-cb-total', cashTotal);
                 set('stat-cb-month', perMonth);
-                set('stat-cb-week', Math.round(perMonth * 12 / 52));
-                const usage = this.calcCashbackUsage();
+                set('stat-cb-week', perWeek);
+                document.getElementById('stat-wb-rest').innerText = `Накопленный остаток ВБ-кэшбека: ${this.formatWbRest()} ₸`;
+                const usage = this.calcCashbackUsage(from, to);
                 set('stat-cb-spent', usage.spent);
                 set('stat-cb-free', usage.free);
 
+                // «Последние 30 дней» не зависит от выбранного периода
                 const since = new Date();
                 since.setDate(since.getDate() - 30);
-                const recent = real.filter(t => t.date >= this.toISODateStr(since));
+                const recent = realAll.filter(t => t.date >= this.toISODateStr(since));
                 const rIn = sum(recent.filter(t => t.type === 'income'));
                 const rOut = sum(recent.filter(t => t.type === 'expense'));
                 const netEl = document.getElementById('stat-30-net');
