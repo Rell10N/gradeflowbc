@@ -606,7 +606,8 @@
             ⚙️ Открыть Настройки
         </button>
 
-        <button class="btn btn-reset" onclick="app.initiateConfirm('reset')">Сбросить ВСЁ</button>
+        <button class="btn btn-sidebar-link" style="margin-top: auto; text-align: center; background: rgba(255,75,75,0.08); border: 1px solid rgba(255,75,75,0.2); color: #ff6b6b;" onclick="app.closeSidebar(); app.initiateConfirm('clearHistory')">Очистить историю</button>
+        <button class="btn btn-reset" style="margin-top: 10px;" onclick="app.initiateConfirm('reset')">Сбросить ВСЁ</button>
     </div>
 
     <!-- SETTINGS MODAL -->
@@ -652,6 +653,10 @@
                     <button class="btn btn-sidebar-link" style="flex: 1; text-align: center; margin: 0;" onclick="document.getElementById('import-file-input').click()">
                         Импорт
                     </button>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-sidebar-link" style="flex: 1; text-align: center; margin: 0; font-size: 0.85rem;" onclick="app.copyData(this)">Скопировать данные</button>
+                    <button class="btn btn-sidebar-link" style="flex: 1; text-align: center; margin: 0; font-size: 0.85rem;" onclick="app.pasteData()">Вставить данные</button>
                 </div>
                 <input type="file" id="import-file-input" style="display: none;" accept=".json" onchange="app.importBackup(event)">
             </div>
@@ -770,16 +775,13 @@
             </div>
 
             <!-- Aesthetic Subtle Clear History Button -->
-            <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
-                <div style="display:flex; flex-wrap:wrap; gap:8px;">
-                    <button id="merge-toggle-btn" class="btn" style="padding: 6px 12px; border-radius: 8px; background: rgba(0,198,255,0.1); border: 1px solid rgba(0,198,255,0.25); color: var(--accent-start); font-size: 0.8rem; font-weight: 500;" onclick="app.toggleMergeMode()">Объединить</button>
-                    <button id="move-toggle-btn" class="btn" style="padding: 6px 12px; border-radius: 8px; background: rgba(0,198,255,0.1); border: 1px solid rgba(0,198,255,0.25); color: var(--accent-start); font-size: 0.8rem; font-weight: 500;" onclick="app.toggleMergeMode('move')">Перенести</button>
-                    <button id="move-confirm-btn" class="btn hidden" style="padding: 6px 12px; border-radius: 8px; background: linear-gradient(135deg, var(--accent-start), var(--accent-end)); color: white; font-size: 0.8rem; font-weight: 600;" onclick="app.pickMoveDate()">Дата</button>
-                    <button id="merge-confirm-btn" class="btn hidden" style="padding: 6px 12px; border-radius: 8px; background: linear-gradient(135deg, var(--accent-start), var(--accent-end)); color: white; font-size: 0.8rem; font-weight: 600;" onclick="app.mergeSelected()">В перевод</button>
+            <div style="display:flex; gap:8px; margin-bottom:10px;">
+                <div style="display:flex; gap:8px; width:100%;">
+                    <button id="merge-toggle-btn" class="btn" style="flex: 1; padding: 8px 6px; text-align: center; white-space: nowrap; border-radius: 8px; background: rgba(0,198,255,0.1); border: 1px solid rgba(0,198,255,0.25); color: var(--accent-start); font-size: 0.8rem; font-weight: 500;" onclick="app.toggleMergeMode()">Объединить</button>
+                    <button id="move-toggle-btn" class="btn" style="flex: 1; padding: 8px 6px; text-align: center; white-space: nowrap; border-radius: 8px; background: rgba(0,198,255,0.1); border: 1px solid rgba(0,198,255,0.25); color: var(--accent-start); font-size: 0.8rem; font-weight: 500;" onclick="app.toggleMergeMode('move')">Перенести</button>
+                    <button id="move-confirm-btn" class="btn hidden" style="flex: 1; padding: 8px 6px; text-align: center; white-space: nowrap; border-radius: 8px; background: linear-gradient(135deg, var(--accent-start), var(--accent-end)); color: white; font-size: 0.8rem; font-weight: 600;" onclick="app.pickMoveDate()">Дата</button>
+                    <button id="merge-confirm-btn" class="btn hidden" style="flex: 1; padding: 8px 6px; text-align: center; white-space: nowrap; border-radius: 8px; background: linear-gradient(135deg, var(--accent-start), var(--accent-end)); color: white; font-size: 0.8rem; font-weight: 600;" onclick="app.mergeSelected()">В перевод</button>
                 </div>
-                <button class="btn" style="padding: 6px 12px; border-radius: 8px; background: rgba(255, 75, 75, 0.08); border: 1px solid rgba(255, 75, 75, 0.15); color: #ff6b6b; font-size: 0.8rem; font-weight: 500; transition: var(--transition);" onclick="app.initiateConfirm('clearHistory')" onmouseover="this.style.background='rgba(255, 75, 75, 0.15)'" onmouseout="this.style.background='rgba(255, 75, 75, 0.08)'">
-                    Очистить историю
-                </button>
             </div>
             
             <div style="position: relative; flex: 1; display: flex; flex-direction: column; overflow: hidden;">
@@ -1987,7 +1989,7 @@
                 try { localStorage.setItem('gradeflow_v3', JSON.stringify(this.data)); } catch (e) { console.error(e); }
             },
 
-            exportBackup: function() {
+            exportBackup: async function() {
                 const dataStr = localStorage.getItem('gradeflow_v3') || JSON.stringify(this.data);
                 const blob = new Blob([dataStr], { type: 'application/json;charset=utf-8;' });
                 const url = URL.createObjectURL(blob);
@@ -2002,6 +2004,23 @@
                 }
                 
                 const exportFileDefaultName = `${filename}.json`;
+
+                // Если браузер умеет — даём выбрать папку (он запоминает последнюю выбранную для этого приложения)
+                if (window.showSaveFilePicker) {
+                    try {
+                        const handle = await window.showSaveFilePicker({
+                            id: 'gradeflow-backups',
+                            suggestedName: exportFileDefaultName,
+                            types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }]
+                        });
+                        const writable = await handle.createWritable();
+                        await writable.write(blob);
+                        await writable.close();
+                        return;
+                    } catch (e) {
+                        if (e.name === 'AbortError') return;
+                    }
+                }
                 
                 const linkElement = document.createElement('a');
                 linkElement.setAttribute('href', url);
@@ -2014,34 +2033,62 @@
                 setTimeout(() => URL.revokeObjectURL(url), 100);
             },
 
+            // strict: для вставки из буфера требуем, чтобы это были данные GradeFlow (есть список transactions)
+            applyImportedData: function(text, strict) {
+                try {
+                    const parsed = JSON.parse(text);
+                    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || (strict && !Array.isArray(parsed.transactions))) {
+                        alert('Это не похоже на данные GradeFlow.');
+                        return false;
+                    }
+                    if (!confirm('Импорт полностью заменит текущие данные. Продолжить?')) return false;
+                    if (!Array.isArray(parsed.transactions)) parsed.transactions = [];
+                    if (parsed.initialBalance === undefined) parsed.initialBalance = 0;
+                    if (parsed.goal === undefined) parsed.goal = 100000;
+
+                    localStorage.setItem('gradeflow_v3', JSON.stringify(parsed));
+                    alert('Данные успешно импортированы!');
+                    location.reload();
+                    return true;
+                } catch (err) {
+                    alert('Ошибка при чтении данных: ' + err.message);
+                    return false;
+                }
+            },
+
             importBackup: function(event) {
                 const file = event.target.files[0];
                 if (!file) return;
-
                 const reader = new FileReader();
                 reader.onload = (e) => {
-                    try {
-                        const parsed = JSON.parse(e.target.result);
-                        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-                            if (!confirm('Импорт полностью заменит текущие данные. Продолжить?')) {
-                                event.target.value = '';
-                                return;
-                            }
-                            if (!Array.isArray(parsed.transactions)) parsed.transactions = [];
-                            if (parsed.initialBalance === undefined) parsed.initialBalance = 0;
-                            if (parsed.goal === undefined) parsed.goal = 100000;
-                            
-                            localStorage.setItem('gradeflow_v3', JSON.stringify(parsed));
-                            alert('Данные успешно импортированы!');
-                            location.reload();
-                        } else {
-                            alert('Неверный формат файла бэкапа.');
-                        }
-                    } catch (err) {
-                        alert('Ошибка при чтении файла бэкапа: ' + err.message);
-                    }
+                    if (!this.applyImportedData(e.target.result, false)) event.target.value = '';
                 };
                 reader.readAsText(file);
+            },
+
+            copyData: function(btn) {
+                const text = localStorage.getItem('gradeflow_v3') || JSON.stringify(this.data);
+                const label = btn.innerText;
+                const done = () => { btn.innerText = 'Скопировано ✓'; setTimeout(() => btn.innerText = label, 1500); };
+                const fallback = () => {
+                    const ta = document.createElement('textarea');
+                    ta.value = text;
+                    document.body.appendChild(ta);
+                    ta.select();
+                    try { document.execCommand('copy'); done(); } catch (e) { alert('Не удалось скопировать'); }
+                    document.body.removeChild(ta);
+                };
+                if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done, fallback);
+                else fallback();
+            },
+
+            pasteData: async function() {
+                let text = '';
+                try {
+                    if (navigator.clipboard && navigator.clipboard.readText) text = await navigator.clipboard.readText();
+                } catch (e) { /* нет доступа к буферу — спросим вручную */ }
+                if (!text) text = prompt('Вставь скопированные данные GradeFlow:') || '';
+                if (text.trim()) this.applyImportedData(text, true);
             },
 
             openModal: function(name) {
