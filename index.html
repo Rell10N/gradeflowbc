@@ -459,6 +459,14 @@
         .stats-period-btn { flex: 1; padding: 8px 4px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; background: rgba(255,255,255,0.05); color: var(--text-sec); }
         .stats-period-btn.active { background: linear-gradient(135deg, var(--accent-start), var(--accent-end)); color: white; }
         .stats-date { flex: 1; min-width: 0; padding: 8px; height: 36px; font-size: 0.85rem; text-align: center; background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 8px; color: var(--text-main); }
+        .history-filters { overflow: hidden; max-height: 600px; transition: max-height 0.25s ease, opacity 0.2s ease, padding 0.25s ease, margin 0.25s ease; }
+        .history-filters.collapsed { max-height: 0; opacity: 0; padding-top: 0 !important; padding-bottom: 0 !important; margin-bottom: 0 !important; border-width: 0; pointer-events: none; }
+        .day-header { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+        .history-more { overflow: hidden; max-height: 200px; margin-top: 8px; transition: max-height 0.25s ease, opacity 0.2s ease, margin 0.25s ease; }
+        .history-more.collapsed { max-height: 0; opacity: 0; margin-top: 0; pointer-events: none; }
+        .day-header.calc-part { background: rgba(255,152,0,0.15); box-shadow: inset 0 0 0 1px rgba(255,152,0,0.45); }
+        .day-header.calc-sel { background: rgba(0,198,255,0.15); box-shadow: inset 0 0 0 1px rgba(0,198,255,0.4); }
+        .icon-btn.active { color: var(--accent-start); }
         .stat-title { font-size: 0.8rem; color: var(--text-sec); text-transform: uppercase; letter-spacing: 0.5px; }
         .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .stat-card { padding: 16px 10px; display: flex; flex-direction: column; gap: 4px; align-items: center; text-align: center; }
@@ -728,11 +736,16 @@
     <div id="history-modal" class="modal">
         <div class="modal-header">
             <h3>История</h3>
-            <button class="icon-btn" onclick="app.closeModal('history')">&times;</button>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span id="calc-total" class="hidden" style="font-weight: 700; font-size: 1rem;"></span>
+                <button id="calc-btn" class="icon-btn" style="font-size: 1.1rem;" onclick="app.toggleCalc()">&Sigma;</button>
+                <button class="icon-btn" onclick="app.closeModal('history')">&times;</button>
+            </div>
         </div>
         <div class="modal-content" style="display: flex; flex-direction: column;">
             <!-- Filter Controls -->
-            <div class="history-filters glass" style="padding: 12px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px;">
+            <button id="filters-toggle" class="btn" style="width: 100%; padding: 8px; margin-bottom: 10px; border-radius: 10px; font-size: 0.85rem; font-weight: 500; background: rgba(255,255,255,0.05); color: var(--text-sec);" onclick="app.toggleFilters()">Фильтры и поиск</button>
+            <div id="history-filters-panel" class="history-filters glass" style="padding: 12px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px;">
                 <!-- Type Filter Buttons -->
                 <div style="display: flex; gap: 8px; width: 100%;">
                     <button class="btn filter-type-btn" id="filter-type-all" style="flex: 1; padding: 8px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; background: var(--accent-start); color: white;" onclick="app.setHistoryTypeFilter('all')">Все</button>
@@ -747,12 +760,15 @@
                         <option value="new">Новые сверху</option>
                         <option value="old">Старые сверху</option>
                         <option value="big">Крупные сверху</option>
+                        <option value="small">Крупные снизу</option>
                     </select>
                 </div>
                 <input id="history-search" type="text" class="input-field" placeholder="Поиск: слово, 100, >1000, 28.10" style="width: 100%; padding: 8px 12px; font-size: 0.85rem; height: 36px; text-align: left; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-main);" oninput="app.renderHistoryList()">
 
                 <!-- Period & Wallet Dropdowns -->
-                <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+                <div style="display: flex; flex-direction: column; width: 100%;">
+                  <button id="more-toggle" class="btn" style="width: 100%; padding: 6px; border-radius: 8px; font-size: 0.8rem; font-weight: 500; background: rgba(255,255,255,0.03); color: var(--text-sec);" onclick="app.toggleMoreFilters()">Период, счёт, комментарии</button>
+                  <div id="history-more" class="history-more" style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
                     <div style="display: flex; gap: 8px; width: 100%;">
                         <select id="filter-month-select" class="input-field" style="flex: 1; padding: 8px; font-size: 0.85rem; font-weight: 500; height: 36px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-main);" onchange="app.setHistoryPeriodFilter()">
                             <option value="all">Все месяцы</option>
@@ -773,13 +789,21 @@
                             <option value="all">Все года</option>
                         </select>
                     </div>
-                    <select id="filter-wallet-select" class="input-field" style="width: 100%; padding: 8px; font-size: 0.85rem; font-weight: 500; height: 36px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-main);" onchange="app.setHistoryPeriodFilter()">
+                    <div style="display: flex; gap: 8px; width: 100%;">
+                    <select id="filter-wallet-select" class="input-field" style="flex: 1; padding: 8px; font-size: 0.85rem; font-weight: 500; height: 36px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-main);" onchange="app.setHistoryPeriodFilter()">
                         <option value="all">Все счета</option>
                         <option value="freedom">Freedom</option>
                         <option value="halyk">Halyk</option>
                         <option value="kaspi">Kaspi</option>
                         <option value="other">Наличные</option>
                     </select>
+                    <select id="history-comment" class="input-field" style="flex: 1; padding: 8px; font-size: 0.85rem; font-weight: 500; height: 36px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-main);" onchange="app.renderHistoryList()">
+                        <option value="any">Комментарии: все</option>
+                        <option value="with">С комментарием</option>
+                        <option value="without">Без комментария</option>
+                    </select>
+                    </div>
+                  </div>
                 </div>
             </div>
 
@@ -941,6 +965,11 @@
                 selectKind: 'merge',
                 statsPeriod: 'all',
                 editId: null,
+                openDay: null,
+                calcMode: false,
+                calcDays: [],
+                calcOps: [],
+                dayNet: {},
                 editType: 'expense',
                 mergeIds: []
             },
@@ -1178,6 +1207,8 @@
 
                 this.initBtnLongPress();
                 this.initWalletLongPress();
+                this.initDayLongPress();
+                document.querySelectorAll('input[type="text"], textarea').forEach(el => { el.spellcheck = false; el.setAttribute('autocorrect', 'off'); });
                 this.remindAboutEntries();
 
                 this.renderUI();
@@ -1377,9 +1408,122 @@
                 else delete tx.isCashback;
 
                 this.closeModal('edit');
+                this.ui.openDay = date;
                 this.saveData();
                 this.renderHistoryList();
                 this.showToast('Сохранено');
+            },
+
+            // В режиме калькулятора зажатие дня раскрывает его (обычный тап выбирает день для суммы)
+            initDayLongPress: function() {
+                const list = document.getElementById('history-list');
+                let timer = null, fired = false;
+                const start = e => {
+                    fired = false;
+                    clearTimeout(timer);
+                    const header = e.target.closest && e.target.closest('.day-header');
+                    if (!header || !this.ui.calcMode) return;
+                    timer = setTimeout(() => {
+                        fired = true;
+                        if (navigator.vibrate) navigator.vibrate(40);
+                        this.toggleHistoryDay(header);
+                    }, 500);
+                };
+                const cancel = () => clearTimeout(timer);
+                list.addEventListener('touchstart', start, { passive: true });
+                list.addEventListener('mousedown', start);
+                ['touchend', 'touchmove', 'touchcancel', 'mouseup', 'mouseleave'].forEach(ev => list.addEventListener(ev, cancel));
+                list.addEventListener('contextmenu', e => { if (this.ui.calcMode) e.preventDefault(); });
+                list.addEventListener('click', e => {
+                    if (fired && this.ui.calcMode) { fired = false; e.stopPropagation(); }
+                }, true);
+            },
+
+            onDayHeaderClick: function(header) {
+                if (!this.ui.calcMode) { this.toggleHistoryDay(header); return; }
+                const date = header.dataset.date;
+                const i = this.ui.calcDays.indexOf(date);
+                if (i >= 0) this.ui.calcDays.splice(i, 1); else this.ui.calcDays.push(date);
+                header.classList.toggle('calc-sel', i < 0);
+                if (i < 0) {
+                    // Выбран весь день — отдельные операции этого дня из выбора убираем
+                    this.ui.calcOps = this.ui.calcOps.filter(id => { const t = this.data.transactions.find(x => x.id === id); return !(t && t.date === date); });
+                    header.classList.remove('calc-part');
+                    if (header.parentElement) header.parentElement.querySelectorAll('.tx-detail-row.sel').forEach(r => r.classList.remove('sel'));
+                }
+                this.updateCalcUI();
+            },
+
+            toggleCalc: function() {
+                this.ui.calcMode = !this.ui.calcMode;
+                this.ui.calcDays = [];
+                this.ui.calcOps = [];
+                document.querySelectorAll('.day-header.calc-sel, .day-header.calc-part').forEach(el => el.classList.remove('calc-sel', 'calc-part'));
+                document.querySelectorAll('.tx-detail-row.sel').forEach(el => el.classList.remove('sel'));
+                if (this.ui.calcMode && this.ui.mergeMode) { this.ui.mergeMode = false; this.ui.mergeIds = []; this.updateMergeUI(); }
+                this.updateCalcUI();
+                if (this.ui.calcMode) this.showToast('Тап — выбрать день, зажать — раскрыть и выбрать операции');
+            },
+
+            // Вклад операции в сумму калькулятора (переводы считаются только при выбранном счёте — как в итоге дня)
+            calcOpValue: function(tx) {
+                if (tx.type === 'income') return tx.amount;
+                if (tx.type === 'expense') return -tx.amount;
+                if (document.getElementById('filter-wallet-select').value === 'all') return 0;
+                return tx.transferDirection === 'in' ? tx.amount : -tx.amount;
+            },
+
+            // Выбор отдельной операции в режиме калькулятора; день при этом подсвечивается оранжевым
+            toggleCalcOp: function(id, el) {
+                const tx = this.data.transactions.find(t => t.id === id);
+                if (!tx || this.ui.calcDays.includes(tx.date)) return;
+                const i = this.ui.calcOps.indexOf(id);
+                if (i >= 0) this.ui.calcOps.splice(i, 1); else this.ui.calcOps.push(id);
+                el.classList.toggle('sel', i < 0);
+                const header = el.closest('.history-day-group').querySelector('.day-header');
+                const partial = this.ui.calcOps.some(opId => { const t = this.data.transactions.find(x => x.id === opId); return t && t.date === tx.date; });
+                header.classList.toggle('calc-part', partial);
+                this.updateCalcUI();
+            },
+
+            updateCalcUI: function() {
+                const opsTotal = this.ui.calcOps.reduce((acc, id) => { const t = this.data.transactions.find(x => x.id === id); return acc + (t ? this.calcOpValue(t) : 0); }, 0);
+                const total = this.ui.calcDays.reduce((acc, d) => acc + (this.ui.dayNet[d] || 0), 0) + opsTotal;
+                const el = document.getElementById('calc-total');
+                el.classList.toggle('hidden', !(this.ui.calcMode && (this.ui.calcDays.length || this.ui.calcOps.length)));
+                el.innerText = `Σ ${total > 0 ? '+' : total < 0 ? '−' : ''}${Math.abs(total).toLocaleString()} ₸`;
+                el.style.color = total < 0 ? 'var(--danger)' : 'var(--success)';
+                document.getElementById('calc-btn').classList.toggle('active', this.ui.calcMode);
+            },
+
+            toggleFilters: function() {
+                this.data.settings.filtersCollapsed = !this.data.settings.filtersCollapsed;
+                localStorage.setItem('gradeflow_v3', JSON.stringify(this.data));
+                this.applyFiltersState();
+            },
+
+            applyFiltersState: function() {
+                document.getElementById('history-filters-panel').classList.toggle('collapsed', !!this.data.settings.filtersCollapsed);
+                document.getElementById('history-more').classList.toggle('collapsed', this.data.settings.moreFiltersCollapsed !== false);
+                this.updateFiltersBar();
+            },
+
+            toggleMoreFilters: function() {
+                this.data.settings.moreFiltersCollapsed = !(this.data.settings.moreFiltersCollapsed !== false);
+                localStorage.setItem('gradeflow_v3', JSON.stringify(this.data));
+                this.applyFiltersState();
+            },
+
+            // Подписи плашек: стрелка по состоянию и точка, если фильтры или поиск что-то отсеивают
+            updateFiltersBar: function() {
+                const moreActive = this.ui.historyFilterMonth !== 'all' || this.ui.historyFilterYear !== 'all'
+                    || document.getElementById('filter-wallet-select').value !== 'all'
+                    || document.getElementById('history-comment').value !== 'any';
+                const active = moreActive || this.ui.historyFilterType !== 'all'
+                    || document.getElementById('history-search').value.trim() !== ''
+                    || document.getElementById('history-sort').value !== 'new';
+                document.getElementById('filters-toggle').innerText = `Фильтры и поиск ${active ? '● ' : ''}${this.data.settings.filtersCollapsed ? '▾' : '▴'}`;
+                document.getElementById('more-toggle').innerText = `Период, счёт, комментарии ${moreActive ? '● ' : ''}${this.data.settings.moreFiltersCollapsed !== false ? '▾' : '▴'}`;
             },
 
             // Остаток ВБ-кэшбека хранится в сотых долях тенге (целое число 0–99), чтобы не плодить дроби
@@ -1626,7 +1770,7 @@
                 const excluded = this.data.settings.excludedWallets;
                 document.querySelectorAll('.wallet-tab').forEach(t => t.classList.toggle('excluded', excluded.includes(t.dataset.wallet)));
                 document.querySelector('.balance-label').innerText = (this.ui.activeWallet === 'all' && excluded.length)
-                    ? `Баланс без: ${excluded.map(w => this.walletLabel(w)).join(', ')}` : 'Доступный баланс';
+                    ? `Баланс (без ${excluded.length})` : 'Доступный баланс';
 
                 // Protect from division-by-zero or negative goals
                 const goalVal = Math.max(1, this.data.goal);
@@ -1678,6 +1822,8 @@
 
                 const query = document.getElementById('history-search').value;
                 if (query.trim()) filteredTxs = filteredTxs.filter(tx => this.matchesSearch(tx, query));
+                const commentMode = document.getElementById('history-comment').value;
+                if (commentMode !== 'any') filteredTxs = filteredTxs.filter(tx => !!(tx.comment && tx.comment.trim()) === (commentMode === 'with'));
                 const sortMode = document.getElementById('history-sort').value;
 
                 const groups = {};
@@ -1701,10 +1847,12 @@
                     }
                 });
 
+                this.ui.dayNet = groups;
                 const sortedDates = Object.keys(groups).sort();
-                if (sortMode === 'big') {
+                if (sortMode === 'big' || sortMode === 'small') {
+                    const dir = sortMode === 'big' ? -1 : 1;
                     const top = d => Math.max(...filteredTxs.filter(t => t.date === d).map(t => t.amount));
-                    sortedDates.sort((a, b) => top(b) - top(a));
+                    sortedDates.sort((a, b) => dir * (top(a) - top(b)));
                 } else if (sortMode !== 'old') {
                     sortedDates.reverse();
                 }
@@ -1740,7 +1888,7 @@
                     const dateDisplay = isToday ? "Сегодня" : localD.toLocaleDateString('ru-RU', {day: 'numeric', month: 'long', year: 'numeric'});
 
                     const dayTxs = filteredTxs.filter(tx => tx.date === date);
-                    if (sortMode === 'big') dayTxs.sort((a, b) => b.amount - a.amount);
+                    if (sortMode === 'big' || sortMode === 'small') dayTxs.sort((a, b) => (sortMode === 'big' ? -1 : 1) * (a.amount - b.amount));
                     let detailsHtml = '';
                     dayTxs.forEach(tx => {
                         let txSign = tx.type === 'income' ? '+' : '-';
@@ -1754,7 +1902,7 @@
                         const walletName = this.walletLabel(tx.wallet || 'freedom');
 
                         detailsHtml += `
-                            <div class="tx-detail-row${this.ui.mergeIds.includes(tx.id) ? ' sel' : ''}" onclick="app.onTxRowClick(${tx.id}, this)">
+                            <div class="tx-detail-row${(this.ui.mergeIds.includes(tx.id) || this.ui.calcOps.includes(tx.id)) ? ' sel' : ''}" onclick="app.onTxRowClick(${tx.id}, this)">
                                 <div style="display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0;">
                                     <div style="display: flex; align-items: center; gap: 8px;">
                                         <span class="tx-detail-amount ${txColor}" style="font-size: 1rem; font-weight: 600;">${txSign}${tx.amount.toLocaleString()} ₸</span>
@@ -1770,7 +1918,7 @@
                     });
 
                     groupDiv.innerHTML = `
-                        <div class="history-item day-header" onclick="app.toggleHistoryDay(this)">
+                        <div class="history-item day-header${this.ui.calcDays.includes(date) ? ' calc-sel' : ''}${!this.ui.calcDays.includes(date) && dayTxs.some(t => this.ui.calcOps.includes(t.id)) ? ' calc-part' : ''}" data-date="${date}" onclick="app.onDayHeaderClick(this)">
                             <span class="h-date">${dateDisplay}</span>
                             <span class="h-amount ${colorClass}">${displayAmount}</span>
                         </div>
@@ -1782,7 +1930,14 @@
                     `;
                     list.appendChild(groupDiv);
                 });
-                if (query.trim() && sortedDates.length <= 30) list.querySelectorAll('.day-header').forEach(h => this.toggleHistoryDay(h));
+                if (query.trim() && sortedDates.length === 1) this.ui.openDay = sortedDates[0];
+                const openHeader = this.ui.openDay && list.querySelector(`.day-header[data-date="${this.ui.openDay}"]`);
+                if (openHeader) {
+                    const details = openHeader.nextElementSibling;
+                    details.classList.add('open');
+                    details.style.maxHeight = 'none';
+                }
+                this.updateFiltersBar();
             },
 
             // Поиск: слово в комментарии/счёте, точная сумма (100), диапазон (>1000, <500), дата (28.10, 28.10.2026, 2026-10-28)
@@ -1860,8 +2015,9 @@
                 this.ui.mergeMode = !same;
                 this.ui.selectKind = kind;
                 this.ui.mergeIds = [];
+                document.querySelectorAll('.tx-detail-row.sel').forEach(el => el.classList.remove('sel'));
+                if (this.ui.mergeMode && this.ui.calcMode) this.toggleCalc();
                 this.updateMergeUI();
-                this.renderHistoryList();
                 if (this.ui.mergeMode && kind === 'edit') this.showToast('Нажми на операцию, чтобы изменить');
             },
 
@@ -1900,10 +2056,13 @@
                 this.updateMergeUI();
                 this.saveData();
                 this.renderHistoryList();
+                this.ui.openDay = dateStr;
+                this.renderHistoryList();
                 this.showToast(`Перенесено на ${dateStr.split('-').reverse().join('.')}: ${moved}`);
             },
 
             onTxRowClick: function(id, el) {
+                if (this.ui.calcMode) { this.toggleCalcOp(id, el); return; }
                 if (!this.ui.mergeMode) return;
                 if (this.ui.selectKind === 'edit') { this.openEdit(id); return; }
                 const tx = this.data.transactions.find(t => t.id === id);
@@ -2045,6 +2204,7 @@
                     details.classList.add('open');
                     details.style.maxHeight = (details.scrollHeight + 15) + 'px';
                 }
+                this.ui.openDay = details.classList.contains('open') ? headerElement.dataset.date : null;
             },
 
             // --- MENU & SIDEBAR ---
@@ -2256,10 +2416,18 @@
                     this.ui.historyFilterYear = 'all';
                     this.ui.mergeMode = false;
                     this.ui.mergeIds = [];
+                    this.ui.openDay = null;
+                    this.ui.calcMode = false;
+                    this.ui.calcDays = [];
+                    this.ui.calcOps = [];
+                    document.getElementById('history-comment').value = 'any';
+                    this.updateCalcUI();
+                    this.applyFiltersState();
                     this.updateMergeUI();
                     document.getElementById('history-search').value = '';
                     document.getElementById('history-sort').value = 'new';
                     document.getElementById('filter-wallet-select').value = 'all';
+                    this.updateFiltersBar();
                     
                     document.querySelectorAll('.filter-type-btn').forEach(btn => {
                         btn.style.background = 'rgba(255,255,255,0.05)';
